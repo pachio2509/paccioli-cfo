@@ -99,17 +99,19 @@ async function pasosCarga(trabajo) {
 }
 async function subir(files) {
   if (!files.length) return;
+  let salioDemo = false;
   const trabajo = (async () => {
     for (const f of files) {
       const r = await fetch("/api/subir?nombre=" + encodeURIComponent(f.name), { method: "POST", body: f });
       const j = await r.json();
       if (!j.ok) throw new Error(f.name + ": " + j.error);
+      salioDemo = salioDemo || !!j.salio_demo;
     }
     await cargar();
   })();
   try { await pasosCarga(trabajo); } catch (e) { toast("No pude leer " + e.message, 6000); return; }
   vista = "resumen"; mostrarVista(); window.scrollTo({ top: 0, behavior: "smooth" });
-  toast("Listo. Ya leí tu estado de cuenta.");
+  toast(salioDemo ? "Listo. Dejamos el demo de Café La Ceiba: estos ya son tus números." : "Listo. Ya leí tu estado de cuenta.", salioDemo ? 5000 : 2600);
 }
 let vista = "resumen";
 function mostrarVista() {
