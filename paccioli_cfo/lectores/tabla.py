@@ -145,6 +145,9 @@ def leer(ruta: str | Path, fuente: str | None = None) -> tuple[list[Movimiento],
     resumen = {"periodo": f"DEL {fechas[0]} AL {fechas[-1]}", "sin_saldos": not saldos}
     if saldos and len(saldos) == len(movs):
         resumen.update(_cuadre(movs, [x for _, x in saldos]))
+    elif saldos:  # saldo solo en algunos renglones (fin de dia): se valida en esos puntos
+        from .pdf_generico import _cuadre as cuadre_parcial
+        resumen.update(cuadre_parcial(movs, saldos, None))
     return movs, resumen
 
 

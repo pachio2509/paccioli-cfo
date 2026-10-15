@@ -20,9 +20,27 @@ def norm(s: str) -> str:
 
 
 def _tiene(texto: str, palabra: str) -> bool:
-    k = norm(palabra).strip()
+    prefijo = palabra.endswith("*")
+    k = norm(palabra.rstrip("*")).strip()
     # solo letras como frontera: BBVA pega numeros de referencia al concepto ("1108260HONORARIOS")
-    return re.search(r"(?<![A-Z])" + re.escape(k) + r"(?![A-Z])", texto) is not None
+    return re.search(r"(?<![A-Z])" + re.escape(k) + ("" if prefijo else r"(?![A-Z])"), texto) is not None
+
+
+TRANSFERENCIA = ("SPEI ENVIADO", "PAGO CUENTA DE TERCERO", "TRANSFERENCIA A", "TRASPASO A TERCERO")
+
+
+def _auto(texto: str, tipo: str, solo_fuertes: bool = False) -> str | None:
+    for regla in REGLAS_AUTO:
+        t, palabras, cat = regla[:3]
+        if solo_fuertes and "fuerte" not in regla[3:]:
+            continue
+        if t not in (tipo, "ambos") or not any(_tiene(texto, p) for p in palabras):
+            continue
+        # "comision" en una transferencia a una persona es una comision que tu pagas, no una comision del banco
+        if cat == "comisiones_banco" and any(x in texto for x in TRANSFERENCIA):
+            return "comisiones_pagadas"
+        return cat
+    return None
 
 
 def contraparte(m: Movimiento) -> str:
@@ -116,22 +134,25 @@ def clasificar(movs: list[Movimiento], reglas_usuario: list[dict], titular: str 
                 break
         if hecho:
             continue
-        if es_cuenta_propia(m, titular):
+        cat = _auto(texto, tipo, solo_fuertes=True)
+        if not cat and es_cuenta_propia(m, titular):
             m.categoria, m.regla = "traspaso_propio", "auto: cuenta propia"
             continue
-        for t, palabras, cat in REGLAS_AUTO:
-            if t not in (tipo, "ambos"):
-                continue
-            if any(_tiene(texto, p) for p in palabras):
-                m.categoria, m.regla = cat, "auto"
-                hecho = True
-                break
-        if not hecho:
-            if m.abono:  # casi todo lo que entra a un negocio es venta: se supone y se pregunta si es grande
+        cat = cat or _auto(texto, tipo)
+        if cat:
+            m.categoria, m.regla = cat, "auto"
+        else:
+            if m.abono and _anonimo(m):  # un deposito grande sin nombre suele ser dinero tuyo: no lo cuento como venta
+                m.categoria, m.regla = "entrada_por_identificar", "supuesto"
+            elif m.abono:  # casi todo lo que entra a un negocio es venta: se supone y se pregunta si es grande
                 m.categoria, m.regla = "ventas", "supuesto"
             else:
                 m.categoria, m.regla = "sin_identificar", "sin regla"
     return movs
+
+
+def _anonimo(m: Movimiento) -> bool:
+    return "sin nombre" in (m.contraparte or "").lower()
 
 
 def seccion(m: Movimiento) -> str:

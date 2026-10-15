@@ -84,7 +84,7 @@ def analizar(espacio: Espacio, hoy: dt.date | None = None) -> dict:
             fin = max((m.fecha for m in ms), default="")
             saldos.append((fin, res["saldo_final"], res.get("banco", "")))
         archivos.append({"nombre": p.name, "banco": res.get("banco", "Archivo"), "periodo": res.get("periodo", ""),
-                         "titular": res.get("titular"), "movimientos": nuevos, "validacion": val,
+                         "titular": res.get("titular"), "rfc": res.get("rfc"), "movimientos": nuevos, "validacion": val,
                          "saldo_final": res.get("saldo_final")})
     if titular and not perfil.get("titular"):
         perfil = espacio.guardar_perfil({"titular": titular})
@@ -100,17 +100,25 @@ def analizar(espacio: Espacio, hoy: dt.date | None = None) -> dict:
         por_mes[mes]["parcial"] = cobertura.get(mes, 0) < _dias_mes(mes) - 1
     saldo = sorted(saldos)[-1][1] if saldos else None
     completos = [m for m in meses if not por_mes[m]["parcial"]]
-    candidatos = completos or sorted(meses, key=lambda m: por_mes[m]["dias"])[-1:]
-    ultimo = candidatos[-1] if candidatos else None
+    periodos = _periodos(archivos, movs, perfil)
+    por_mes.update({k: v for k, v, _ in periodos})
+    if completos:
+        ultimo = completos[-1]
+    elif periodos:  # tu estado no corta en mes calendario: muestro el periodo completo, como lo ve tu banco
+        ultimo = periodos[-1][0]
+    else:
+        candidatos = sorted(meses, key=lambda m: por_mes[m]["dias"])[-1:]
+        ultimo = candidatos[-1] if candidatos else None
     dias_tot = sum(cobertura.values()) or 1
     salidas_tot = sum(m.cargo for m in movs if seccion(m) != "traspaso")
     estado = {
         "negocio": perfil.get("nombre_negocio") or (titular or "Tu negocio").title(),
         "perfil": perfil,
         "carpeta": str(espacio.estados),
+        "es_demo": espacio.es_demo,
         "actualizado": dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "archivos": archivos, "errores": errores,
-        "meses": [{"mes": m, "nombre": nombre_mes(m)} for m in meses],
+        "meses": [{"mes": m, "nombre": nombre_mes(m)} for m in meses] + [{"mes": k, "nombre": nom, "periodo": True} for k, _, nom in periodos],
         "por_mes": por_mes,
         "tendencia": [{"mes": m, "nombre": nombre_mes(m), "ingresos": por_mes[m]["ingresos"],
                        "gastos": por_mes[m]["gastos"], "utilidad": por_mes[m]["utilidad"]} for m in meses],
@@ -127,6 +135,38 @@ def analizar(espacio: Espacio, hoy: dt.date | None = None) -> dict:
     return estado
 
 
+def _fechas_periodo(texto: str) -> list[dt.date]:
+    import re as _re
+    pts = []
+    for g in _re.findall(r"(\d{2})/(\d{2})/(\d{4})|(\d{4})-(\d{2})-(\d{2})", texto or ""):
+        pts.append(dt.date(int(g[2]), int(g[1]), int(g[0])) if g[0] else dt.date(int(g[3]), int(g[4]), int(g[5])))
+    return pts
+
+
+def _periodos(archivos, movs, perfil) -> list[tuple[str, dict, str]]:
+    """Estados de cuenta que no cortan en mes calendario (del 7 sep al 6 oct): una vista con el periodo completo."""
+    out, vistos = [], set()
+    for f in archivos:
+        pts = _fechas_periodo(f.get("periodo"))
+        if len(pts) < 2:
+            continue
+        ini, fin = pts[0], pts[-1]
+        sig = fin + dt.timedelta(days=1)
+        if ini.day == 1 and sig.day == 1:
+            continue  # corta en mes calendario: ya esta en los meses
+        k = f"P:{ini.isoformat()}_{fin.isoformat()}"
+        if k in vistos:
+            continue
+        vistos.add(k)
+        ms = [m for m in movs if ini.isoformat() <= m.fecha <= fin.isoformat()]
+        d = _mes(ms, perfil)
+        d["dias"], d["parcial"], d["es_periodo"] = (fin - ini).days + 1, False, True
+        d["desde"], d["hasta"] = ini.isoformat(), fin.isoformat()
+        nom = f"{ini.day} {MESES[ini.month - 1].lower()} – {fin.day} {MESES[fin.month - 1].lower()}"
+        out.append((k, d, nom))
+    return out
+
+
 def _dias_mes(mes: str) -> int:
     a, m = map(int, mes.split("-"))
     sig = dt.date(a + (m == 12), 1 if m == 12 else m + 1, 1)
@@ -135,16 +175,9 @@ def _dias_mes(mes: str) -> int:
 
 def _cobertura(archivos, movs) -> dict[str, int]:
     """Cuantos dias de cada mes cubren tus estados de cuenta (para no comparar meses incompletos)."""
-    import re as _re
     dias: dict[str, set] = {}
     for f in archivos:
-        fechas = _re.findall(r"(\d{2})/(\d{2})/(\d{4})|(\d{4})-(\d{2})-(\d{2})", f.get("periodo") or "")
-        pts = []
-        for g in fechas:
-            if g[0]:
-                pts.append(dt.date(int(g[2]), int(g[1]), int(g[0])))
-            else:
-                pts.append(dt.date(int(g[3]), int(g[4]), int(g[5])))
+        pts = _fechas_periodo(f.get("periodo"))
         if len(pts) >= 2:
             d = pts[0]
             while d <= pts[-1]:
@@ -186,6 +219,9 @@ def _mes(movs, perfil) -> dict:
         if sep and c.get("iva"):
             monto /= (1 + IVA)
         lineas[m.categoria] += monto
+    mitad_tarjetas = sum(m.cargo for m in movs if m.categoria == "tarjetas") / 2 if perfil.get("tarjetas") == "mixto" else 0.0
+    if mitad_tarjetas:
+        lineas["tarjetas_negocio"] += mitad_tarjetas / (1 + IVA) if sep else mitad_tarjetas
     externo = float(perfil.get("otros_ingresos_mensual") or 0) if perfil.get("otros_ingresos") == "si" else 0.0
     sec = lambda s: sum(v for k, v in lineas.items() if CATEGORIAS[k]["seccion"] == s)
     ventas = sec("ventas") + (externo / (1 + IVA) if sep else externo)
@@ -205,17 +241,20 @@ def _mes(movs, perfil) -> dict:
     for m in movs:
         if seccion(m) in ("financiero", "personal", "aportacion"):
             abajo[m.categoria] += m.importe
+    if mitad_tarjetas:
+        abajo["tarjetas"] += mitad_tarjetas
     clientes = defaultdict(float)
     canal = {}
     for m in movs:
         if m.abono and seccion(m) == "ventas":
             clientes[m.contraparte] += m.abono
-            canal[m.contraparte] = m.categoria != "ventas"
+            canal[m.contraparte] = m.categoria in ("ventas_tarjeta", "ventas_plataforma")
     gastos_cat = defaultdict(float)
     for m in movs:
         if m.cargo and seccion(m) not in ("traspaso",):
             gastos_cat[CATEGORIAS[m.categoria]["label"]] += m.cargo
-    iva_cobrado = sum(m.abono * IVA / (1 + IVA) for m in movs if seccion(m) == "ventas") if sep else 0
+    iva_cobrado = sum(m.abono * IVA / (1 + IVA) for m in movs if seccion(m) == "ventas" and CATEGORIAS[m.categoria].get("iva")) if sep else 0
+    netas = sum(m.abono for m in movs if m.categoria == "comisiones_netas")
     iva_pagado = (sum(m.cargo * IVA / (1 + IVA) for m in movs if seccion(m) in OPERACION and CATEGORIAS[m.categoria].get("iva"))
                   + sum(m.cargo for m in movs if seccion(m) == "iva")) if sep else 0
     impuestos_pagados = sum(m.cargo for m in movs if m.categoria == "impuestos")
@@ -237,15 +276,21 @@ def _mes(movs, perfil) -> dict:
         "gastos_categoria": [{"nombre": k, "monto": round(v, 2)} for k, v in sorted(gastos_cat.items(), key=lambda kv: -kv[1])],
         "iva": {"cobrado": round(iva_cobrado, 2), "pagado": round(iva_pagado, 2), "neto": round(iva_cobrado - iva_pagado, 2)},
         "impuestos_pagados": round(impuestos_pagados, 2),
-        "impuestos": _impuestos(ventas, ingresos, gastos, utilidad, iva_cobrado - iva_pagado, perfil),
+        "impuestos": _impuestos(ventas, ingresos, gastos, utilidad, iva_cobrado - iva_pagado, perfil, netas),
+        "comisiones_netas": round(netas, 2),
         "n_movimientos": len(movs),
         "personal": round(-sum(v for k, v in abajo.items() if CATEGORIAS[k]["seccion"] == "personal"), 2),
         "tarjetas": round(-abajo.get("tarjetas", 0), 2),
     }
 
 
-def _impuestos(ventas, ingresos, gastos, utilidad, iva_neto, perfil) -> dict:
+def _impuestos(ventas, ingresos, gastos, utilidad, iva_neto, perfil, netas=0.0) -> dict:
     reg = perfil.get("regimen") or ""
+    if netas and netas >= 0.3 * max(ingresos, 1):
+        # la aseguradora o promotoria ya retuvo ISR e IVA: sin su estado de comisiones cualquier estimado sale mal
+        return {"definido": False, "netas": True,
+                "texto": f"Cobraste {netas:,.0f} de comisiones que llegan netas: ya te retuvieron ISR e IVA. "
+                         "Para estimar tus impuestos necesito tu estado de comisiones (bruto, ISR e IVA retenidos)."}
     iva = max(iva_neto, 0) if _separa_iva(perfil) else 0
     if reg == "resico":
         isr = fiscal.isr_resico_pf(ingresos)

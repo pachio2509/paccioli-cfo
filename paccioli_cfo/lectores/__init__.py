@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from . import bbva_pdf, tabla
+from . import bbva_pdf, pdf_generico, tabla
 
 SOPORTADOS = (".pdf", ".csv", ".xlsx", ".xlsm", ".txt")
 
@@ -19,8 +19,7 @@ def leer(ruta: str | Path):
             movs, res = bbva_pdf.leer(ruta, "BBVA " + ("Libretón" if "LIBRET" in inicio.upper() else "Empresas"))
             res["banco"] = "BBVA"
             return movs, res
-        raise ValueError(f"{ruta.name}: por ahora leo PDF de BBVA. De otros bancos descarga tus movimientos en Excel o CSV "
-                         f"desde tu banca en línea y suéltalos aquí.")
+        return pdf_generico.leer(ruta)  # cualquier otro banco: lector universal que valida contra los saldos
     if ext in (".csv", ".xlsx", ".xlsm", ".txt"):
         return tabla.leer(ruta)
-    raise ValueError(f"{ruta.name}: formato no soportado. Usa PDF de BBVA, Excel o CSV.")
+    raise ValueError(f"{ruta.name}: formato no soportado. Usa el PDF de tu banco, o Excel o CSV.")

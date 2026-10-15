@@ -25,32 +25,41 @@ Que vende, paga, cobra y paga tarjetas, y al final no sabe cuánto le quedó de 
 
 No necesitas saber contabilidad. Si sabes descargar tu estado de cuenta, ya puedes.
 
-## Instálalo en 3 pasos
+## Úsalo como te sea más fácil
 
-**1. Descárgalo**
+### Opción 1 · Pídeselo a Claude (lo más fácil)
+
+1. Descarga el skill: **[paccioli-cfo-skill.zip](https://github.com/pachio2509/paccioli-cfo/releases/latest/download/paccioli-cfo-skill.zip)**.
+2. Súbelo a Claude: **Configuración → Capacidades → Skills → Subir skill**.
+   ¿Usas Claude Code? Descomprímelo en `~/.claude/skills/`.
+3. Escríbele a Claude: *"Aquí está mi estado de cuenta, ¿cómo va mi negocio?"* y adjunta tu archivo.
+
+Claude lo lee (de **cualquier banco**, aunque sea un PDF escaneado o una foto), lo cuadra contra tu banco, te hace 2 o 3 preguntas y te entrega tu tablero.
+
+### Opción 2 · En tu computadora, en un paso
+
+**Mac:** abre la app **Terminal**, pega esto y presiona Enter:
 
 ```bash
-git clone https://github.com/pachio2509/paccioli-cfo.git
-cd paccioli-cfo
+curl -fsSL https://raw.githubusercontent.com/pachio2509/paccioli-cfo/main/instalar-en-1-paso.sh | bash
 ```
 
-¿No usas git? Botón verde **Code → Download ZIP** y descomprímelo.
+Se instala, te deja un acceso **«Paccioli CFO»** en tu Escritorio y abre tu tablero. Las siguientes veces, doble clic en ese acceso.
 
-**2. Instálalo** (una sola vez, necesitas [Python 3.9+](https://www.python.org/downloads/))
+**Windows:** descarga el [ZIP](https://github.com/pachio2509/paccioli-cfo/archive/refs/heads/main.zip), descomprímelo y haz doble clic en `iniciar.bat`.
+(Necesitas [Python 3.9 o más nuevo](https://www.python.org/downloads/); al instalarlo marca *Add Python to PATH*.)
 
-| Mac / Linux | Windows |
-|---|---|
-| `./instalar.sh` | doble clic en `instalar.bat` |
+### Opción 3 · Para quien usa git
 
-**3. Ábrelo**
-
-| Mac / Linux | Windows |
-|---|---|
-| `./iniciar.sh` | doble clic en `iniciar.bat` |
-
-Se abre tu navegador. **Arrastra tu estado de cuenta** y listo.
+```bash
+git clone https://github.com/pachio2509/paccioli-cfo.git && cd paccioli-cfo && ./iniciar.sh
+```
 
 > ¿Quieres verlo antes de usar tus datos? Corre `./iniciar.sh --demo` (o `iniciar.bat --demo`) y juega con **Café La Ceiba**, un negocio de ejemplo.
+
+### Después: suelta tu estado de cuenta
+
+Se abre tu navegador con **Lucca**, tu CFO. **Arrastra tu estado de cuenta** (PDF, Excel o CSV de tu banco) y en un minuto ves cuánto vendiste, cuánto gastaste, cuánto te quedó y cuánto apartar para el SAT.
 
 ## Qué te dice
 
@@ -105,11 +114,11 @@ Deja abierto el tablero. Cada vez que sueltas un archivo nuevo en la carpeta `mi
 
 | Archivo | Estado |
 |---|---|
-| **PDF de BBVA** (cuenta empresarial y Libretón) | ✅ Validado al centavo contra el resumen del banco |
-| **Excel / CSV de cualquier banco o app** (Santander, Banorte, Banamex, HSBC, Nu, Mercado Pago, Clip...) | ✅ Si trae saldo, revisa que cada renglón cuadre |
-| PDF de otros bancos | 🔜 Mientras, descarga el Excel o CSV desde tu banca en línea |
+| **PDF de cualquier banco** (BBVA, Santander, Banorte, Banamex, HSBC, Scotiabank, Nu, Hey, Mercado Pago...) | ✅ Lee las columnas solo y **revisa que cada saldo cuadre al centavo**. Si no cuadra, te lo dice en rojo. |
+| **Excel / CSV** de cualquier banco o app | ✅ Si trae saldo, revisa que cada renglón cuadre |
+| **PDF escaneado o foto** | ✅ Con el skill de Claude (opción 1): Claude lo transcribe y el programa lo valida contra los saldos |
 
-¿Tu banco no funciona? [Abre un issue](https://github.com/pachio2509/paccioli-cfo/issues) con el nombre del banco (**nunca subas tu estado de cuenta real**).
+¿Tu banco no cuadra? [Abre un issue](https://github.com/pachio2509/paccioli-cfo/issues) con el nombre del banco (**nunca subas tu estado de cuenta real**).
 
 ## Cómo piensa (los principios de un CFO)
 
@@ -121,12 +130,20 @@ Deja abierto el tablero. Cada vez que sueltas un archivo nuevo en la carpeta `mi
 
 Más detalle en [docs/como-funciona.md](docs/como-funciona.md).
 
+## ¿Necesitas algo más especializado?
+
+Planeación fiscal, contabilidad, declaraciones o un CFO que revise tus números contigo: escríbele a **Jorge Ayala** (Kaptal) por [WhatsApp 999 175 0122](https://wa.me/529991750122) o a [jorge@kaptal.com.mx](mailto:jorge@kaptal.com.mx).
+
 ## Para desarrolladores
 
 ```bash
 python -m paccioli_cfo                  # tablero (carpeta actual)
 python -m paccioli_cfo --demo           # negocio de ejemplo
 python -m paccioli_cfo resumen          # tus números en la terminal
+python -m paccioli_cfo exportar         # tu tablero en un solo archivo HTML (sin servidor)
+python -m paccioli_cfo preguntas        # lo que el CFO necesita saber (JSON)
+python -m paccioli_cfo responder ID VALOR
+./skill/empaquetar.sh                   # arma dist/paccioli-cfo-skill.zip
 python -m paccioli_cfo --carpeta ~/mi-negocio --puerto 9000
 python -m pytest                        # pruebas (solo datos inventados)
 ```

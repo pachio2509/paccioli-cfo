@@ -18,7 +18,7 @@ PERFIL_VACIO = {
     "cuenta": "",             # solo_negocio | mixta
     "otros_ingresos": "",     # no | si
     "otros_ingresos_mensual": 0,
-    "tarjetas": "",           # negocio | personal | mixto
+    "tarjetas": "",           # por_desglosar | negocio | personal | mixto
     "consumos": "",           # negocio | personal
     "efectivo": "",           # negocio | personal
 }
@@ -31,6 +31,11 @@ class Espacio:
         self.datos = self.raiz / "mi-negocio"
         self.estados.mkdir(parents=True, exist_ok=True)
         self.datos.mkdir(parents=True, exist_ok=True)
+
+    @property
+    def es_demo(self) -> bool:
+        """El negocio de ejemplo: aqui no se suben estados de cuenta reales (se mezclarian con datos inventados)."""
+        return (self.datos / ".demo").exists()
 
     # ---------- perfil
     @property

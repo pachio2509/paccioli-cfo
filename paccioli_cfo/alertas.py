@@ -17,11 +17,11 @@ def generar(e: dict, mes: str | None, hoy: dt.date) -> list[dict]:
     a: list[dict] = []
     add = lambda nivel, titulo, detalle, accion="": a.append({"nivel": nivel, "titulo": titulo, "detalle": detalle, "accion": accion})
     if not mes:
-        add("info", "Suelta tu estado de cuenta para empezar", "Arrastra el PDF de BBVA o el Excel/CSV de tu banco al tablero, o ponlo en la carpeta mis-estados-de-cuenta.")
+        add("info", "Suelta tu estado de cuenta para empezar", "Arrastra el PDF, Excel o CSV de tu banco al tablero, o ponlo en la carpeta mis-estados-de-cuenta.")
         return a
     d = e["por_mes"][mes]
     p = e["perfil"]
-    meses = [x["mes"] for x in e["meses"]]
+    meses = [x["mes"] for x in e["meses"] if not x.get("periodo")]
     ing, util, gastos = d["ingresos"], d["utilidad"], d["gastos"]
 
     for f in e["archivos"]:
@@ -29,6 +29,30 @@ def generar(e: dict, mes: str | None, hoy: dt.date) -> list[dict]:
             add("rojo", f"{f['nombre']} no cuadra con el banco", f["validacion"]["texto"], "Revisa que el archivo esté completo.")
     for err in e["errores"]:
         add("ambar", f"No pude leer {err['archivo']}", err["error"])
+
+    # ¿son del mismo negocio?
+    titulares = {}
+    for f in e["archivos"]:
+        k = (f.get("rfc") or "").upper() or " ".join(sorted(_norm(f.get("titular") or "").split()))
+        if k:
+            titulares.setdefault(k, f.get("titular") or f.get("rfc"))
+    if len(titulares) > 1:
+        add("rojo", "Subiste estados de cuenta de personas o empresas distintas",
+            "Son de " + " y ".join(sorted(t.title() for t in titulares.values())) + ". Los estoy sumando como si fueran un solo negocio.",
+            "Quita los que no son de este negocio, o usa una carpeta para cada uno.")
+    if e.get("es_demo"):
+        ajenos = [f["nombre"] for f in e["archivos"] if not f["nombre"].startswith("cafe-la-ceiba")]
+        if ajenos:
+            add("rojo", "Hay un estado de cuenta real mezclado con el demo",
+                f"{', '.join(ajenos)} se está sumando a los números inventados de Café La Ceiba.",
+                "Quítalo de aquí y abre Paccioli CFO sin --demo para ver tus números.")
+
+    # periodo que no es mes calendario
+    if d.get("es_periodo"):
+        add("info", "Tu estado de cuenta no corta en mes calendario",
+            f"Va del {d['desde'][8:]}/{d['desde'][5:7]} al {d['hasta'][8:]}/{d['hasta'][5:7]}: te muestro el periodo completo. "
+            "Para cerrar un mes exacto, sube también el estado anterior.",
+            "Sube el estado de cuenta del periodo anterior.")
 
     # utilidad
     if ing and util < 0:
@@ -66,9 +90,16 @@ def generar(e: dict, mes: str | None, hoy: dt.date) -> list[dict]:
             add("ambar", f"{part:.0%} de tus ventas viene de {top['nombre']}", "Si ese cliente se va, tu negocio se cae.",
                 "Busca 2 o 3 clientes más de ese tamaño.")
 
+    # comisiones netas (aseguradoras, promotorias)
+    if d.get("comisiones_netas"):
+        add("ambar", f"Cobraste {_p(d['comisiones_netas'])} de comisiones que llegan netas",
+            "La aseguradora o promotoría ya te retuvo ISR e IVA. Sin tu estado de comisiones no sé cuánto vendiste en bruto ni cuánto te retuvieron.",
+            "Pide tu estado de comisiones del mes (bruto, ISR e IVA retenidos).")
+
     # tarjetas y mezcla personal
-    if d["tarjetas"] and d["salidas"] and d["tarjetas"] / d["salidas"] > 0.2 and p.get("tarjetas") != "personal":
-        add("ambar", f"{d['tarjetas'] / d['salidas']:.0%} de lo que sale va a tarjetas", f"Pagaste {_p(d['tarjetas'])} de tarjetas y no sé en qué se gastó.",
+    if d["tarjetas"] and d["salidas"] and d["tarjetas"] / d["salidas"] > 0.2 and p.get("tarjetas") in ("", "por_desglosar", "mixto"):
+        add("ambar", f"{d['tarjetas'] / d['salidas']:.0%} de lo que sale va a tarjetas",
+            f"Pagaste {_p(d['tarjetas'])} de tarjetas y no sé en qué se gastó. Las dejo aparte: si fueran gasto del negocio, tu utilidad sería {_p(util - d['tarjetas'])}.",
             "Suelta aquí el estado de cuenta de tu tarjeta.")
     if d["personal"] and ing and d["personal"] / ing > 0.1:
         add("ambar", f"Sacaste {_p(d['personal'])} para gastos personales", "Es dinero del negocio que no se queda en el negocio.",
@@ -77,7 +108,8 @@ def generar(e: dict, mes: str | None, hoy: dt.date) -> list[dict]:
         add("info", "Usas la misma cuenta para el negocio y para ti", "Así es difícil saber cuánto ganas de verdad.", "Abre una cuenta solo para el negocio.")
 
     # sin identificar
-    sin = [m for m in e["movimientos"] if m["mes"] == mes and m["regla"] in ("sin regla", "supuesto")]
+    en = (lambda m: d["desde"] <= m["fecha"] <= d["hasta"]) if d.get("es_periodo") else (lambda m: m["mes"] == mes)
+    sin = [m for m in e["movimientos"] if en(m) and m["regla"] in ("sin regla", "supuesto")]
     monto_sin = sum(m["cargo"] + m["abono"] for m in sin)
     if monto_sin and (d["entradas"] + d["salidas"]) and monto_sin / (d["entradas"] + d["salidas"]) > 0.1:
         add("ambar", f"Hay {_p(monto_sin)} que no sé qué son", f"{len(sin)} movimientos sin identificar.", "Contesta las preguntas del tablero.")
@@ -98,6 +130,11 @@ def generar(e: dict, mes: str | None, hoy: dt.date) -> list[dict]:
                 "El tope es $3.5 millones. Si lo pasas, cambias de régimen y pagas más.", "Habla con tu contador antes de que pase.")
     orden = {"rojo": 0, "ambar": 1, "info": 2, "verde": 3}
     return sorted(a, key=lambda x: orden[x["nivel"]])
+
+
+def _norm(s: str) -> str:
+    import unicodedata
+    return unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode().upper()
 
 
 def _mes(n: int) -> str:

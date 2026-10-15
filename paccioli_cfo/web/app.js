@@ -7,9 +7,13 @@ const pct = (v) => (v == null ? "—" : (v * 100).toFixed(1) + "%");
 const NS = "http://www.w3.org/2000/svg";
 
 let E = null, version = null, mesSel = null, buscar = "";
+// archivo exportado (python -m paccioli_cfo exportar): los datos vienen dentro, sin servidor
+const ESTATICO = !!window.__ESTADO__;
+const lucca = (pose) => (window.__LUCCA__ && window.__LUCCA__[pose]) || "/lucca/lucca-" + pose + ".png";
 
 // ---------------------------------------------------------------- datos
 async function cargar() {
+  if (ESTATICO) { E = window.__ESTADO__; mesSel = mesSel || E.mes_actual; render(); vivo(true); return; }
   try {
     const r = await fetch("/api/estado", { cache: "no-store" });
     E = await r.json();
@@ -31,9 +35,10 @@ async function vigilar() {
 function vivo(ok) {
   const l = $("#live");
   l.classList.toggle("off", !ok);
-  l.lastChild.textContent = ok ? (E && E.actualizado ? "En vivo · " + E.actualizado.slice(11, 19) : "En vivo") : "Sin conexión con el servidor";
+  l.lastChild.textContent = ESTATICO ? "Tablero del " + (E && E.actualizado ? E.actualizado.slice(0, 10) : "") : ok ? (E && E.actualizado ? "En vivo · " + E.actualizado.slice(11, 19) : "En vivo") : "Sin conexión con el servidor";
 }
 async function post(url, body) {
+  if (ESTATICO) throw new Error("Este tablero es un archivo: para contestar, ábrelo en Paccioli CFO o díselo a Claude.");
   const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const j = await r.json();
   if (!j.ok) throw new Error(j.error || "Algo salió mal");
@@ -86,10 +91,10 @@ function mostrarVista() {
 document.querySelectorAll(".vista").forEach((b) => b.addEventListener("click", () => { vista = b.dataset.v; mostrarVista(); }));
 $("#archivo").addEventListener("change", (e) => { subir([...e.target.files]); e.target.value = ""; });
 let arrastre = 0;
-window.addEventListener("dragenter", (e) => { e.preventDefault(); arrastre++; $("#overlay").hidden = false; });
+window.addEventListener("dragenter", (e) => { e.preventDefault(); if (ESTATICO) return; arrastre++; $("#overlay").hidden = false; });
 window.addEventListener("dragleave", () => { if (--arrastre <= 0) { arrastre = 0; $("#overlay").hidden = true; } });
 window.addEventListener("dragover", (e) => e.preventDefault());
-window.addEventListener("drop", (e) => { e.preventDefault(); arrastre = 0; $("#overlay").hidden = true; subir([...e.dataTransfer.files]); });
+window.addEventListener("drop", (e) => { e.preventDefault(); if (ESTATICO) return; arrastre = 0; $("#overlay").hidden = true; subir([...e.dataTransfer.files]); });
 $("#imprimir").addEventListener("click", () => window.print());
 $("#buscar").addEventListener("input", (e) => { buscar = e.target.value.toLowerCase(); renderMovs(); });
 
@@ -104,9 +109,9 @@ function render() {
   if (!hay) { if (E.errores && E.errores.length) toast(E.errores[0].error, 7000); return; }
   const d = E.por_mes[mesSel];
   const nombreMes = E.meses.find((m) => m.mes === mesSel).nombre;
-  $("#periodo").textContent = "Cierre de " + nombreMes + (d.parcial ? ` · mes incompleto (${d.dias} días)` : "");
+  $("#periodo").textContent = d.es_periodo ? `Periodo de tu estado de cuenta · ${nombreMes} (${d.dias} días)` : "Cierre de " + nombreMes + (d.parcial ? ` · mes incompleto (${d.dias} días)` : "");
   $("#titulo").textContent = "¿Cómo le fue a " + E.negocio + "?";
-  $("#meses").innerHTML = E.meses.map((m) => `<button class="month" role="tab" aria-selected="${m.mes === mesSel}" data-m="${m.mes}">${esc(m.nombre)}${E.por_mes[m.mes].parcial ? "<small>parcial</small>" : ""}</button>`).join("");
+  $("#meses").innerHTML = E.meses.map((m) => `<button class="month" role="tab" aria-selected="${m.mes === mesSel}" data-m="${m.mes}">${esc(m.nombre)}${E.por_mes[m.mes].parcial ? "<small>parcial</small>" : m.periodo ? "<small>periodo</small>" : ""}</button>`).join("");
   document.querySelectorAll(".month").forEach((b) => b.addEventListener("click", () => { mesSel = b.dataset.m; render(); }));
   const prev = mesAnterior();
   renderVeredicto(d, prev); renderSalud(d, prev); renderKpis(d, prev); renderAlertas(); renderPreguntas(); renderSim(d);
@@ -116,7 +121,12 @@ function render() {
 
 const ORDEN = ["rojo", "ambar", "verde", "info"];
 const porNivel = (xs) => [...xs].sort((x, y) => ORDEN.indexOf(x.nivel) - ORDEN.indexOf(y.nivel));
+const enMes = (m) => {
+  const d = E.por_mes[mesSel];
+  return d && d.es_periodo ? m.fecha >= d.desde && m.fecha <= d.hasta : m.mes === mesSel;
+};
 function mesAnterior() {
+  if (E.por_mes[mesSel] && E.por_mes[mesSel].es_periodo) return null;
   const i = E.meses.findIndex((m) => m.mes === mesSel);
   return i > 0 ? E.por_mes[E.meses[i - 1].mes] : null;
 }
@@ -135,13 +145,14 @@ function renderVeredicto(d, prev) {
   const txt = { rojo: "Semáforo rojo", ambar: "Semáforo ámbar", verde: "Semáforo verde", info: "Tu resumen" }[nivel];
   const ut = d.utilidad;
   $("#big").textContent = peso(ut);
+  $(".big-l").textContent = d.es_periodo ? "Lo que te quedó en el periodo" : "Lo que te quedó este mes";
   $("#big").classList.toggle("neg", ut < 0);
   const c100 = d.ingresos ? (ut / d.ingresos) * 100 : null;
   $("#big-s").innerHTML = `${c100 != null ? `De cada <b>$100</b> que vendes ${c100 >= 0 ? `te quedan <b>$${c100.toFixed(2)}</b>` : `<b>pierdes $${(-c100).toFixed(2)}</b>`}` : ""} ${delta(ut, prev && prev.utilidad)}`;
   $("#veredicto").className = "bubble " + nivel;
   $("#veredicto").innerHTML = `<span class="tag">${txt}</span>
     ${a ? `<p><b>${esc(a.titulo)}.</b> ${esc(a.accion || a.detalle)}</p>` : `<p>${ut >= 0 ? "Tu operación dejó" : "Tu operación perdió"} <b>${peso(Math.abs(ut))}</b> sobre ventas de ${peso(d.ingresos)}.</p>`}`;
-  $("#lucca-hero").src = "/lucca/lucca-" + (nivel === "verde" || nivel === "info" ? "pulgar" : nivel === "rojo" ? "libreta" : "cafe") + ".png";
+  $("#lucca-hero").src = lucca(nivel === "verde" || nivel === "info" ? "pulgar" : nivel === "rojo" ? "libreta" : "cafe");
 }
 
 // ---------------------------------------------------------------- salud financiera (0-100)
@@ -151,7 +162,7 @@ function salud(d, prev) {
   const sinId = d.lineas.filter((l) => l.seccion === "sin_identificar").reduce((s, l) => s + l.monto, 0);
   const f = [
     ["Rentabilidad", d.utilidad <= 0 ? 0 : lim(((d.margen || 0) / 0.15) * 100), d.margen != null ? pct(d.margen) + " de margen" : "—"],
-    dias != null ? ["Colchón de caja", lim((dias / 30) * 100), Math.max(0, Math.round(dias)) + " días"] : null,
+    dias != null ? ["Colchón de caja", lim((dias / 30) * 100), Math.max(0, Math.round(dias)) + (Math.round(dias) === 1 ? " día" : " días")] : null,
     ["Claridad de tus números", d.gastos ? lim((1 - sinId / d.gastos / 0.5) * 100) : 100, d.gastos ? pct(sinId / d.gastos) + " sin identificar" : "—"],
     prev && prev.ingresos ? ["Tendencia de ventas", lim((((d.ingresos - prev.ingresos) / prev.ingresos + 0.3) / 0.35) * 100), pct((d.ingresos - prev.ingresos) / prev.ingresos) + " vs mes ant."] : null,
   ].filter(Boolean);
@@ -383,7 +394,7 @@ function renderER(d) {
 
 function renderMovs() {
   if (!E || !E.movimientos) return;
-  let ms = E.movimientos.filter((m) => m.mes === mesSel);
+  let ms = E.movimientos.filter(enMes);
   if (buscar) ms = ms.filter((m) => (m.descripcion + " " + m.contraparte + " " + m.etiqueta).toLowerCase().includes(buscar));
   const ops = Object.entries(E.categorias).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
   const chip = (r) => r === "tuya" || r.startsWith("tu respuesta") ? '<span class="chip tuya">tú</span>' : r === "sin regla" || r === "supuesto" ? `<span class="chip sin">${r === "supuesto" ? "supuesto" : "sin identificar"}</span>` : '<span class="chip">auto</span>';
@@ -407,4 +418,7 @@ function renderArchivos() {
   $("#supuestos").textContent = (E.supuestos || []).join(" ");
 }
 
-cargar().then(vigilar);
+if (ESTATICO) {
+  document.querySelectorAll('label[for="archivo"], #archivo').forEach((x) => (x.hidden = true));
+  cargar();
+} else cargar().then(vigilar);

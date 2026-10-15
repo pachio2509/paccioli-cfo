@@ -110,8 +110,10 @@ def crear_handler(estado: Estado):
                 if u.path == "/api/subir":
                     nombre = unquote(parse_qs(u.query).get("nombre", ["estado.pdf"])[0])
                     nombre = re.sub(r"[^\w.\- ]", "_", Path(nombre).name)[:120]
+                    if esp.es_demo:
+                        return self._json({"ok": False, "error": "Estás en el demo de Café La Ceiba. Para usar tus datos, cierra esta ventana y abre Paccioli CFO sin --demo: ./iniciar.sh"}, 400)
                     if Path(nombre).suffix.lower() not in SOPORTADOS:
-                        return self._json({"ok": False, "error": "Sube un PDF de BBVA, o un Excel o CSV de tu banco."}, 400)
+                        return self._json({"ok": False, "error": "Sube el PDF, Excel o CSV de tu estado de cuenta."}, 400)
                     destino = esp.estados / nombre
                     destino.write_bytes(self._cuerpo())
                     return self._json({"ok": True, "archivo": nombre})

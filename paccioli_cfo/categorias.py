@@ -18,15 +18,18 @@ CATEGORIAS = {
     "ventas":            {"label": "Ventas a clientes", "seccion": "ventas", "iva": True},
     "ventas_tarjeta":    {"label": "Ventas con tarjeta (terminal)", "seccion": "ventas", "iva": True},
     "ventas_plataforma": {"label": "Ventas en plataformas y tienda en línea", "seccion": "ventas", "iva": True},
+    "comisiones_netas":  {"label": "Comisiones cobradas (llegan netas de retenciones)", "seccion": "ventas", "iva": False},
     "otros_ingresos":    {"label": "Otros ingresos (rentas, intereses)", "seccion": "otros_ingresos", "iva": False},
     "prestamo":          {"label": "Préstamos recibidos", "seccion": "aportacion"},
     "aportacion":        {"label": "Aportaciones del dueño o socios", "seccion": "aportacion"},
     "devolucion":        {"label": "Reembolsos y devoluciones", "seccion": "aportacion"},
     "traspaso_propio":   {"label": "Traspasos entre mis cuentas", "seccion": "traspaso"},
+    "entrada_por_identificar": {"label": "Depósitos por identificar (no los cuento como venta)", "seccion": "aportacion"},
     # ---------- costo directo
     "proveedores":       {"label": "Proveedores y mercancía", "seccion": "costo", "iva": True, "variable": True},
     "paqueteria":        {"label": "Envíos y paquetería", "seccion": "costo", "iva": True, "variable": True},
     "comisiones_venta":  {"label": "Comisiones de terminal y plataformas", "seccion": "gasto_venta", "iva": True, "variable": True},
+    "comisiones_pagadas": {"label": "Comisiones pagadas a terceros", "seccion": "gasto_venta", "variable": True},
     # ---------- gastos de operacion
     "nomina":            {"label": "Nómina y colaboradores", "seccion": "gasto_admin"},
     "imss":              {"label": "IMSS e Infonavit", "seccion": "gasto_admin"},
@@ -43,6 +46,7 @@ CATEGORIAS = {
     "otros_gastos":      {"label": "Otros gastos del negocio", "seccion": "gasto_admin", "iva": True},
     # ---------- debajo de la linea
     "tarjetas":          {"label": "Pagos de tarjetas de crédito", "seccion": "financiero", "preguntar": True},
+    "tarjetas_negocio":  {"label": "Compras con tarjeta del negocio (la mitad de tus pagos)", "seccion": "gasto_admin", "iva": True, "virtual": True},
     "creditos":          {"label": "Pagos de créditos y préstamos", "seccion": "financiero"},
     "impuestos":         {"label": "Pagos al SAT y otros impuestos", "seccion": "financiero"},
     "iva_comision":      {"label": "IVA de comisiones bancarias", "seccion": "iva"},
@@ -51,7 +55,9 @@ CATEGORIAS = {
     "sin_identificar":   {"label": "Sin identificar (contesta las preguntas)", "seccion": "sin_identificar"},
 }
 
-# (tipo, palabras clave [cualquiera], categoria). Se evaluan en orden; la primera que coincide gana.
+# (tipo, palabras clave [cualquiera], categoria[, "fuerte"]). Se evaluan en orden; la primera que coincide gana.
+# "fuerte": gana aunque el movimiento lleve tu nombre (pagar tu tarjeta o tu credito no es un traspaso entre tus cuentas).
+# Una palabra que termina en * coincide como prefijo ("PGO CREDIT*" encuentra "PGO CREDITL").
 REGLAS_AUTO = [
     ("cargo", ["IVA COM", "IVA COMISION", "IVA POR COMISION"], "iva_comision"),
     ("cargo", ["COMISION", "SERV BANCA", "ANUALIDAD", "MEMBRESIA BANCO", "MANEJO DE CUENTA"], "comisiones_banco"),
@@ -60,14 +66,16 @@ REGLAS_AUTO = [
     ("abono", ["CLIP", "GETNET", "BILLPOCKET", "SUMUP", "ZETTLE", "VENTAS TPV", "DEPOSITO TPV", "LIQUIDACION TPV", "VTAS TDC", "VTAS TDD", "NETPAY", "TERMINAL"], "ventas_tarjeta"),
     ("abono", ["STRIPE", "PAYPAL", "SHOPIFY", "MERCADO PAGO", "MERCADOPAGO", "MERCADO LIBRE", "AMAZON", "RAPPI", "UBER EATS", "DIDI", "CONEKTA", "OPENPAY", "KUESKI", "ETSY"], "ventas_plataforma"),
     ("abono", ["REEMBOLSO", "DEVOLUCION", "BONIFICACION"], "devolucion"),
+    ("abono", ["ALLIANZ", "ALLI", "COMIS A", "COMISIONES A", "AGENTE DE SEGUR*", "PROMOTORIA", "GRUPO NACIONAL PROVINCIAL", "GNP SEGUROS", "AXA SEGUROS",
+               "MAPFRE", "QUALITAS", "CHUBB", "METLIFE", "ZURICH", "HDI SEGUROS", "SEGUROS MONTERREY", "BANORTE SEGUROS", "PLAN SEGURO"], "comisiones_netas"),
     ("abono", ["DISPOSICION DE CREDITO", "DISPOSICION CREDITO", "PRESTAMO", "CREDITO SIMPLE"], "prestamo"),
     ("abono", ["APORTACION", "ABONO DE CAPITAL", "CAPITAL SOCIO"], "aportacion"),
     ("cargo", ["NOMINA", "SUELDO", "DISPERSION", "AGUINALDO", "FINIQUITO", "SALARIO"], "nomina"),
     ("cargo", ["SIPARE", "IMSS", "INFONAVIT"], "imss"),
     ("cargo", ["SAT ", "SAT|", "IMPUESTO", "DECLARACION", "TESORERIA", "SECRETARIA DE FINANZAS", "ISN"], "impuestos"),
-    ("cargo", ["AMERICAN EXPRESS", "AMEX", "PAGO TARJETA", "PAGO TDC", "PAGO TC ", "TARJETA DE CREDITO", "LIQUIDACION TARJETA", "INVEX", "BANAMEX TDC", "NU MEXICO TARJETA"], "tarjetas"),
+    ("cargo", ["AMERICAN EXPRESS", "AMEX", "PAGO TARJETA", "PAGO TDC", "PAGO TC ", "TARJETA DE CREDITO", "LIQUIDACION TARJETA", "INVEX", "BANAMEX TDC", "NU MEXICO TARJETA"], "tarjetas", "fuerte"),
     ("cargo", ["LEASING", "ARRENDAMIENTO PURO", "ARRENDADORA"], "arrendamiento"),
-    ("cargo", ["PAGO CREDITO", "PGO CREDIT", "PAGO PRESTAMO", "AMORTIZACION", "HIPOTECA", "DOMICILIACION C", "KONFIO", "CREDITO PYME"], "creditos"),
+    ("cargo", ["PAGO CREDITO", "PGO CREDIT*", "PAGO CRED*", "PAGO PRESTAMO", "AMORTIZACION", "HIPOTECA", "DOMICILIACION C", "KONFIO", "CREDITO PYME"], "creditos", "fuerte"),
     ("cargo", ["CFE", "TELMEX", "TOTALPLAY", "TOTAL PLAY", "IZZI", "MEGACABLE", "TELCEL", "AT&T", "ATT ", "MOVISTAR", "SIAPA", "JAPAY", "SACMEX", "AGUA ", "GAS NATURAL", "NATURGY", "STARLINK"], "servicios"),
     ("cargo", ["FACEBK", "FACEBOOK", "META ADS", "META PLATFORMS", "GOOGLE ADS", "TIKTOK", "LINKEDIN", "PINTEREST", "MAILCHIMP", "HUBSPOT"], "publicidad"),
     ("cargo", ["GOOGLE", "MICROSOFT", "ADOBE", "NOTION", "CANVA", "APPLE.COM", "APPLE COM", "OPENAI", "CHATGPT", "ANTHROPIC", "ZOOM", "SLACK", "DROPBOX", "TWILIO", "AWS", "AMAZON WEB", "GODADDY", "WIX", "SHOPIFY", "ALEGRA", "CONTPAQ", "ASPEL", "SPOTIFY", "NETFLIX"], "software"),
@@ -101,6 +109,7 @@ OPCIONES_CARGO = [
     ("publicidad", "Publicidad"),
     ("honorarios", "Contador o asesor"),
     ("impuestos", "Impuestos"),
+    ("comisiones_pagadas", "Comisión pagada a un tercero"),
     ("tarjetas", "Pago de tarjeta"),
     ("creditos", "Pago de crédito"),
     ("traspaso_propio", "A otra cuenta mía"),

@@ -13,3 +13,5 @@ build/
 dist/
 .pytest_cache/
 .DS_Store
+# Tableros exportados: llevan tus numeros adentro
+tablero-*.html

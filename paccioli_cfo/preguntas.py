@@ -62,7 +62,7 @@ def generar(movs, p: dict, estado: dict) -> list[dict]:
 
     # decisiones en bloque
     bloques = [("tarjetas", "tarjetas", "Pagaste {t} de tarjetas de crédito. Lo que compras con tarjeta, ¿es del negocio?",
-                "Para saberlo exacto, suelta aquí el estado de cuenta de la tarjeta."),
+                "Si no estás seguro, déjalas aparte: no cambian tu utilidad hasta que sueltes aquí el estado de cuenta de la tarjeta."),
                ("consumos", "consumos", "Hay {t} en comidas, súper y consumos. ¿Son del negocio?", "Si son personales, no cuentan como gasto."),
                ("efectivo", "efectivo", "Sacaste {t} en efectivo. ¿Para qué es?", "El efectivo sin comprobante no es deducible.")]
     for campo, cat, titulo, det in bloques:
@@ -70,7 +70,11 @@ def generar(movs, p: dict, estado: dict) -> list[dict]:
         if tot and not p.get(campo):
             ops = [{"valor": "negocio", "label": "Del negocio"}, {"valor": "personal", "label": "Personal"}]
             if campo == "tarjetas":
-                ops.append({"valor": "mixto", "label": "Mitad y mitad"})
+                # lo honesto cuando no tienes el estado de la tarjeta: dejarlas aparte, no adivinar
+                ops = [{"valor": "por_desglosar", "label": "Todavía no sé: déjalas aparte"},
+                       {"valor": "negocio", "label": "Todo es del negocio"},
+                       {"valor": "personal", "label": "Todo es personal"},
+                       {"valor": "mixto", "label": "Mitad y mitad"}]
             q.append({"id": f"perfil:{campo}", "tipo": "perfil", "campo": campo, "prioridad": 5,
                       "titulo": titulo.format(t=_peso(tot)), "detalle": det, "opciones": ops, "monto": round(tot, 2)})
 
