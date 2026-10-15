@@ -9,8 +9,12 @@ import datetime as dt
 from . import fiscal
 
 
+_CTX: dict = {}
+
+
 def _p(x) -> str:
-    return f"${x:,.0f}"
+    from .paises import dinero
+    return dinero(x, _CTX)
 
 
 def generar(e: dict, mes: str | None, hoy: dt.date) -> list[dict]:
@@ -21,6 +25,10 @@ def generar(e: dict, mes: str | None, hoy: dt.date) -> list[dict]:
         return a
     d = e["por_mes"][mes]
     p = e["perfil"]
+    ctx = e.get("contexto") or {"uso": "negocio", "es_mx": True, "autoridad": "el SAT"}
+    _CTX.clear(); _CTX.update(ctx)
+    personal = ctx["uso"] == "personal"
+    aut = ctx["autoridad"]
     meses = [x["mes"] for x in e["meses"] if not x.get("periodo")]
     ing, util, gastos = d["ingresos"], d["utilidad"], d["gastos"]
 
@@ -54,8 +62,17 @@ def generar(e: dict, mes: str | None, hoy: dt.date) -> list[dict]:
             "Para cerrar un mes exacto, sube también el estado anterior.",
             "Sube el estado de cuenta del periodo anterior.")
 
-    # utilidad
-    if ing and util < 0:
+    # utilidad (o ahorro, en finanzas personales)
+    if personal and ing:
+        if util < 0:
+            add("rojo", f"Gastaste {_p(-util)} más de lo que te entró", f"Te entraron {_p(ing)} y gastaste {_p(gastos)}.",
+                "Revisa tus 3 gastos más grandes de este mes.")
+        elif d["margen"] is not None and d["margen"] < 0.10:
+            add("ambar", f"Ahorraste {d['margen']:.0%} de lo que te entró", f"Te sobraron {_p(util)} de {_p(ing)}.",
+                "Lo sano es ahorrar al menos 10% cada mes.")
+        else:
+            add("verde", f"Ahorraste {_p(util)} ({d['margen']:.0%} de lo que te entró)", "Vas bien: sigue así.")
+    elif ing and util < 0:
         add("rojo", f"Este mes perdiste {_p(-util)}", f"Ingresaste {_p(ing)} y gastaste {_p(gastos)} en la operación.",
             "Revisa tus 3 gastos más grandes y si puedes subir precios.")
     elif ing and d["margen"] is not None and d["margen"] < 0.10:
@@ -75,7 +92,7 @@ def generar(e: dict, mes: str | None, hoy: dt.date) -> list[dict]:
         add("ambar", f"Salió más dinero del que entró: {_p(-d['flujo'])}", "Sin contar traspasos entre tus cuentas.")
 
     # equilibrio
-    if d["equilibrio"] and ing:
+    if d["equilibrio"] and ing and not personal:
         colchon = (ing - d["equilibrio"]) / ing
         if colchon < 0.15:
             add("ambar", f"Necesitas vender {_p(d['equilibrio'])} al mes para no perder",
@@ -83,7 +100,7 @@ def generar(e: dict, mes: str | None, hoy: dt.date) -> list[dict]:
 
     # dependencia de un cliente
     clientes = [c for c in d["clientes"] if "sin nombre" not in c["nombre"].lower() and not c.get("canal")]
-    if clientes and d["ventas"]:
+    if clientes and d["ventas"] and not personal:
         top = clientes[0]
         part = top["monto"] / sum(c["monto"] for c in d["clientes"])
         if part >= 0.4 and len(clientes) > 1:
@@ -93,18 +110,18 @@ def generar(e: dict, mes: str | None, hoy: dt.date) -> list[dict]:
     # comisiones netas (aseguradoras, promotorias)
     if d.get("comisiones_netas"):
         add("ambar", f"Cobraste {_p(d['comisiones_netas'])} de comisiones que llegan netas",
-            "La aseguradora o promotoría ya te retuvo ISR e IVA. Sin tu estado de comisiones no sé cuánto vendiste en bruto ni cuánto te retuvieron.",
-            "Pide tu estado de comisiones del mes (bruto, ISR e IVA retenidos).")
+            "La aseguradora o promotoría ya te retuvo impuestos. Sin tu estado de comisiones no sé cuánto vendiste en bruto ni cuánto te retuvieron.",
+            "Pide tu estado de comisiones del mes (bruto e impuestos retenidos).")
 
     # tarjetas y mezcla personal
     if d["tarjetas"] and d["salidas"] and d["tarjetas"] / d["salidas"] > 0.2 and p.get("tarjetas") in ("", "por_desglosar", "mixto"):
         add("ambar", f"{d['tarjetas'] / d['salidas']:.0%} de lo que sale va a tarjetas",
             f"Pagaste {_p(d['tarjetas'])} de tarjetas y no sé en qué se gastó. Las dejo aparte: si fueran gasto del negocio, tu utilidad sería {_p(util - d['tarjetas'])}.",
             "Suelta aquí el estado de cuenta de tu tarjeta.")
-    if d["personal"] and ing and d["personal"] / ing > 0.1:
+    if d["personal"] and ing and d["personal"] / ing > 0.1 and not personal:
         add("ambar", f"Sacaste {_p(d['personal'])} para gastos personales", "Es dinero del negocio que no se queda en el negocio.",
             "Ponte un sueldo fijo y abre una cuenta solo para el negocio.")
-    if p.get("cuenta") == "mixta":
+    if p.get("cuenta") == "mixta" and not personal:
         add("info", "Usas la misma cuenta para el negocio y para ti", "Así es difícil saber cuánto ganas de verdad.", "Abre una cuenta solo para el negocio.")
 
     # sin identificar
@@ -117,13 +134,16 @@ def generar(e: dict, mes: str | None, hoy: dt.date) -> list[dict]:
     # impuestos
     imp = d["impuestos"]
     venc = dt.date.fromisoformat(e["proximo_vencimiento"])
-    if imp.get("definido"):
-        add("info", f"Aparta {_p(imp['total'])} para el SAT", f"{imp['texto']} Vence el {venc.day} de {_mes(venc.month)}. Es un estimado: confírmalo con tu contador.")
-    elif p.get("regimen") != "no_se":
+    if personal:
+        pass
+    elif imp.get("definido"):
+        cuando = f" Vence el {venc.day} de {_mes(venc.month)}." if ctx["es_mx"] else ""
+        add("info", f"Aparta {_p(imp['total'])} para {aut}", f"{imp['texto']}{cuando} Es un estimado: confírmalo con tu contador.")
+    elif ctx["es_mx"] and p.get("regimen") != "no_se" and not imp.get("netas"):
         add("info", "¿Cuánto vas a pagar de impuestos?", "Contesta tu régimen fiscal y te digo cuánto apartar.")
-    if ing and not d["impuestos_pagados"] and p.get("regimen") not in (None, "", "no_se"):
-        add("ambar", "No veo pago al SAT este mes", f"Si tuviste ingresos, tu declaración vence el {venc.day} de {_mes(venc.month)}.")
-    if p.get("regimen") == "resico" and meses:
+    if ctx["es_mx"] and not personal and ing and not d["impuestos_pagados"] and p.get("regimen") not in (None, "", "no_se"):
+        add("ambar", f"No veo pago a {aut} este mes", f"Si tuviste ingresos, tu declaración vence el {venc.day} de {_mes(venc.month)}.")
+    if ctx["es_mx"] and p.get("regimen") == "resico" and meses:
         anual = sum(e["por_mes"][m]["ingresos"] for m in meses) / len(meses) * 12
         if anual > fiscal.TOPE_RESICO_PF * 0.85:
             add("rojo" if anual > fiscal.TOPE_RESICO_PF else "ambar", f"Vas a {_p(anual)} al año: cerca del tope de RESICO",

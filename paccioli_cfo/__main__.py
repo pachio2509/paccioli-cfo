@@ -97,7 +97,9 @@ def main(argv=None) -> int:
         print("\nTu CFO te avisa:")
         for x in e["alertas"]:
             print(f"  [{x['nivel'].upper():5}] {x['titulo']}")
-        print(f"\nTe quiero preguntar {sum(1 for q in e['preguntas'] if q['tipo'] != 'info')} cosas: abre el tablero para contestarlas.")
+        n = sum(1 for q in e['preguntas'] if q['tipo'] != 'info')
+        if n:
+            print(f"\nTe quiero preguntar {n} cosa{'s' if n != 1 else ''}: abre el tablero para contestarla{'s' if n != 1 else ''}.")
         return 0
 
     from .servidor import iniciar

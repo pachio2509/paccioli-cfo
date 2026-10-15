@@ -3,4 +3,4 @@
 Suelta tu estado de cuenta, contesta un par de preguntas y ve tus números de CFO
 en un tablero en vivo. Todo corre en tu computadora.
 """
-__version__ = "1.3.0"
+__version__ = "1.4.0"

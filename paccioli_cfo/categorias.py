@@ -20,6 +20,7 @@ CATEGORIAS = {
     "ventas_plataforma": {"label": "Ventas en plataformas y tienda en línea", "seccion": "ventas", "iva": True},
     "comisiones_netas":  {"label": "Comisiones cobradas (llegan netas de retenciones)", "seccion": "ventas", "iva": False},
     "otros_ingresos":    {"label": "Otros ingresos (rentas, intereses)", "seccion": "otros_ingresos", "iva": False},
+    "sueldo":            {"label": "Sueldo o nómina que recibes", "seccion": "otros_ingresos", "iva": False},
     "prestamo":          {"label": "Préstamos recibidos", "seccion": "aportacion"},
     "aportacion":        {"label": "Aportaciones del dueño o socios", "seccion": "aportacion"},
     "devolucion":        {"label": "Reembolsos y devoluciones", "seccion": "aportacion"},
@@ -61,12 +62,13 @@ CATEGORIAS = {
 REGLAS_AUTO = [
     ("cargo", ["IVA COM", "IVA COMISION", "IVA POR COMISION"], "iva_comision"),
     ("cargo", ["COMISION", "SERV BANCA", "ANUALIDAD", "MEMBRESIA BANCO", "MANEJO DE CUENTA"], "comisiones_banco"),
-    ("abono", ["INTERESES", "RENDIMIENTO", "10 FRACTIONAL", "RENTA "], "otros_ingresos"),
+    ("abono", ["INTERESES", "RENDIMIENTO", "PAGO RENTA", "RENTA "], "otros_ingresos"),
     ("ambos", ["TRASPASO", "TRANSF ENTRE CUENTAS", "TRANSF ENRE CUENTAS", "TRANSFERENCIA ENTRE CUENTAS", "TRASPASO PROPIO", "ENTRE CUENTAS PROPIAS"], "traspaso_propio"),
+    ("abono", ["NOMINA", "SUELDO", "PAGO DE NOMINA", "DEPOSITO NOMINA"], "sueldo"),
     ("abono", ["CLIP", "GETNET", "BILLPOCKET", "SUMUP", "ZETTLE", "VENTAS TPV", "DEPOSITO TPV", "LIQUIDACION TPV", "VTAS TDC", "VTAS TDD", "NETPAY", "TERMINAL"], "ventas_tarjeta"),
     ("abono", ["STRIPE", "PAYPAL", "SHOPIFY", "MERCADO PAGO", "MERCADOPAGO", "MERCADO LIBRE", "AMAZON", "RAPPI", "UBER EATS", "DIDI", "CONEKTA", "OPENPAY", "KUESKI", "ETSY"], "ventas_plataforma"),
     ("abono", ["REEMBOLSO", "DEVOLUCION", "BONIFICACION"], "devolucion"),
-    ("abono", ["ALLIANZ", "ALLI", "COMIS A", "COMISIONES A", "AGENTE DE SEGUR*", "PROMOTORIA", "GRUPO NACIONAL PROVINCIAL", "GNP SEGUROS", "AXA SEGUROS",
+    ("abono", ["ALLIANZ", "COMIS A", "COMISIONES A", "AGENTE DE SEGUR*", "PROMOTORIA", "GRUPO NACIONAL PROVINCIAL", "GNP SEGUROS", "AXA SEGUROS",
                "MAPFRE", "QUALITAS", "CHUBB", "METLIFE", "ZURICH", "HDI SEGUROS", "SEGUROS MONTERREY", "BANORTE SEGUROS", "PLAN SEGURO"], "comisiones_netas"),
     ("abono", ["DISPOSICION DE CREDITO", "DISPOSICION CREDITO", "PRESTAMO", "CREDITO SIMPLE"], "prestamo"),
     ("abono", ["APORTACION", "ABONO DE CAPITAL", "CAPITAL SOCIO"], "aportacion"),
@@ -94,11 +96,33 @@ FINTECH = ("REVOLUT", "NVIO", "NU MEXICO", "NUBANK", "HEY BANCO", "KLAR", "STORI
 # Opciones de respuesta para las preguntas (lo que el usuario ve)
 OPCIONES_ABONO = [
     ("ventas", "Venta o cobro a un cliente"),
+    ("sueldo", "Mi sueldo o nómina"),
     ("traspaso_propio", "Dinero de otra cuenta mía"),
     ("prestamo", "Un préstamo o crédito"),
     ("aportacion", "Lo puse yo o un socio"),
     ("devolucion", "Reembolso o devolución"),
     ("otros_ingresos", "Otro ingreso (renta, intereses)"),
+]
+# en finanzas personales las opciones hablan de tu vida, no de un negocio
+OPCIONES_ABONO_PERSONAL = [
+    ("sueldo", "Mi sueldo o nómina"),
+    ("ventas", "Pago por un trabajo o algo que vendí"),
+    ("traspaso_propio", "Dinero de otra cuenta mía"),
+    ("prestamo", "Un préstamo"),
+    ("devolucion", "Reembolso o devolución"),
+    ("otros_ingresos", "Otro ingreso (renta, intereses)"),
+]
+OPCIONES_CARGO_PERSONAL = [
+    ("consumos", "Súper, comida o restaurante"),
+    ("renta", "Renta o hipoteca"),
+    ("servicios", "Luz, agua, internet o teléfono"),
+    ("combustible", "Transporte o gasolina"),
+    ("seguros", "Seguro o salud"),
+    ("software", "Suscripción (streaming, apps)"),
+    ("tarjetas", "Pago de tarjeta"),
+    ("creditos", "Pago de crédito"),
+    ("traspaso_propio", "A otra cuenta mía"),
+    ("personal", "Otro gasto personal"),
 ]
 OPCIONES_CARGO = [
     ("proveedores", "Proveedor o mercancía"),

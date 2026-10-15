@@ -2,10 +2,10 @@
 
 # Paccioli CFO
 
-### Tu CFO en tu computadora.
+### Un skill de CFO que crea tu dashboard.
 
-Le das tu estado de cuenta. Te dice cuánto ganaste, cuánto te toca pagar al SAT,<br>
-cuántos días te alcanza el dinero y qué tienes que arreglar. **En vivo y gratis.**
+Le das tu estado de cuenta, de cualquier banco. Te arma tu dashboard financiero:<br>
+cuánto te entró, cuánto gastaste, cuánto te quedó, cuánto apartar para impuestos y qué arreglar. **Gratis.**
 
 [![pruebas](https://github.com/pachio2509/paccioli-cfo/actions/workflows/pruebas.yml/badge.svg)](https://github.com/pachio2509/paccioli-cfo/actions/workflows/pruebas.yml)
 ![Python](https://img.shields.io/badge/python-3.9%2B-0F1B2D)
@@ -20,21 +20,26 @@ cuántos días te alcanza el dinero y qué tienes que arreglar. **En vivo y grat
 
 ## ¿Para quién es?
 
-Para el dueño de un negocio o el emprendedor que **cierra el mes sin saber si ganó dinero**.
-Que vende, paga, cobra y paga tarjetas, y al final no sabe cuánto le quedó de verdad.
+Para **cualquiera que cierra el mes sin saber cómo le fue**:
+
+- **Dueños de negocio y emprendedores:** cuánto vendiste, tu utilidad real, tu punto de equilibrio y tus impuestos.
+- **Independientes y profesionistas:** cuánto cobraste, cuánto te quedó y cuánto apartar.
+- **Finanzas personales:** cuánto te entró, en qué se te fue y cuánto ahorraste.
+
+En **cualquier país**: México (con ISR, RESICO e IVA), Colombia, Perú, Chile, Argentina, España y más, con tu moneda y tu impuesto (IVA, IGV, ITBIS…).
 
 No necesitas saber contabilidad. Si sabes descargar tu estado de cuenta, ya puedes.
 
 ## Úsalo como te sea más fácil
 
-### Opción 1 · Pídeselo a Claude (lo más fácil)
+### Opción 1 · El skill de CFO en Claude (lo más fácil)
 
 1. Descarga el skill: **[paccioli-cfo-skill.zip](https://github.com/pachio2509/paccioli-cfo/releases/latest/download/paccioli-cfo-skill.zip)**.
 2. Súbelo a Claude: **Configuración → Capacidades → Skills → Subir skill**.
    ¿Usas Claude Code? Descomprímelo en `~/.claude/skills/`.
-3. Escríbele a Claude: *"Aquí está mi estado de cuenta, ¿cómo va mi negocio?"* y adjunta tu archivo.
+3. Escríbele a Claude: *"Aquí está mi estado de cuenta, hazme mi dashboard"* y adjunta tu archivo.
 
-Claude lo lee (de **cualquier banco**, aunque sea un PDF escaneado o una foto), lo cuadra contra tu banco, te hace 2 o 3 preguntas y te entrega tu tablero.
+Claude lo lee (de **cualquier banco**, aunque sea un PDF escaneado o una foto), lo cuadra contra tu banco, te hace 2 o 3 preguntas y te entrega tu dashboard.
 
 ### Opción 2 · En tu computadora, en un paso
 
@@ -59,17 +64,17 @@ git clone https://github.com/pachio2509/paccioli-cfo.git && cd paccioli-cfo && .
 
 ### Después: suelta tu estado de cuenta
 
-Se abre tu navegador con **Lucca**, tu CFO. **Arrastra tu estado de cuenta** (PDF, Excel o CSV de tu banco) y en un minuto ves cuánto vendiste, cuánto gastaste, cuánto te quedó y cuánto apartar para el SAT.
+Se abre tu navegador con **Lucca**, tu CFO. **Arrastra tu estado de cuenta** (PDF, Excel o CSV de tu banco) y en un minuto ves cuánto te entró, cuánto gastaste, cuánto te quedó y cuánto apartar para impuestos.
 
 ## Qué te dice
 
 | | |
 |---|---|
 | **Semáforo** | En una frase: cómo te fue y qué es lo más importante. |
-| **Ingresos, gastos y utilidad** | Sin IVA, como los ve un CFO. Lo que es del SAT no es tuyo. |
+| **Ingresos, gastos y utilidad** | Sin IVA (o IGV, ITBIS…), como los ve un CFO. Lo que es de tu autoridad fiscal no es tuyo. |
 | **Punto de equilibrio** | Lo mínimo que tienes que vender al mes para no perder. |
 | **Colchón de caja** | Cuántos días de pagos cubre lo que tienes en el banco. |
-| **Aparta para el SAT** | ISR + IVA estimados según tu régimen (RESICO, actividad empresarial o persona moral) y cuándo vence. |
+| **Aparta para impuestos** | En México: ISR + IVA según tu régimen (RESICO, actividad empresarial o persona moral) y cuándo vence. En otros países: el IVA/IGV por pagar. |
 | **¿Quién te paga?** | Tus clientes y canales. Te avisa si dependes demasiado de uno. |
 | **¿En qué se va tu dinero?** | Todo lo que salió, por concepto. |
 | **Estado de resultados** | Completo, con lo que va "debajo de la línea" (tarjetas, créditos, retiros). |
@@ -129,6 +134,10 @@ Deja abierto el tablero. Cada vez que sueltas un archivo nuevo en la carpeta `mi
 5. **Cada criterio que decides se vuelve regla.** Contestas una vez.
 
 Más detalle en [docs/como-funciona.md](docs/como-funciona.md).
+
+## Úsalo con tu marca (contadores, despachos y consultores)
+
+¿Quieres dárselo a tus clientes con tu nombre? Copia `marca.ejemplo.json` como `marca.json` junto al programa y pon tu nombre, tu WhatsApp, tu correo, tu logo y tus colores. El dashboard, el archivo exportado y el skill (`./skill/empaquetar.sh`) salen con tu marca. Con `"mostrar_asesor": false` no aparece ningún contacto.
 
 ## ¿Necesitas algo más especializado?
 

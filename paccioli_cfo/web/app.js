@@ -2,7 +2,34 @@
 "use strict";
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-const peso = (v) => (v < 0 ? "−$" : "$") + Math.abs(Math.round(v)).toLocaleString("es-MX");
+// dinero en la moneda de tu pais (MXN, COP, PEN, EUR...) con el formato de tu pais
+let FMT = null;
+const peso = (v) => {
+  if (!FMT) {
+    const c = (E && E.contexto) || {};
+    try { FMT = new Intl.NumberFormat(c.locale || "es-MX", { style: "currency", currency: c.moneda || "MXN", maximumFractionDigits: 0, minimumFractionDigits: 0 }); }
+    catch (e) { FMT = new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 }); }
+  }
+  return (v < 0 ? "−" : "") + FMT.format(Math.abs(Math.round(v)));
+};
+const simb = () => (E && E.contexto && E.contexto.simbolo) || "$";
+// textos segun quien lo usa: negocio, independiente o finanzas personales
+function T() {
+  const c = (E && E.contexto) || {}, u = c.uso || "negocio", per = u === "personal", ind = u === "independiente";
+  const imp = c.impuesto || "IVA", aut = c.autoridad || "el SAT";
+  return {
+    per, ind, imp, aut,
+    titulo: per ? (E.negocio && E.negocio !== "Tus Finanzas" ? "¿Cómo van las finanzas de " + E.negocio + "?" : "¿Cómo van tus finanzas?") : "¿Cómo le fue a " + E.negocio + "?",
+    big: per ? "Lo que te sobró" : "Lo que te quedó",
+    vendes: per ? "te entran" : ind ? "cobras" : "vendes",
+    k1: per ? "Te entró" : ind ? "Cobraste" : "Vendiste",
+    k1s: per || !c.tasa ? "En el periodo" : "Sin " + imp,
+    deLo: per ? " de lo que te entró" : ind ? " de lo que cobraste" : " de lo que vendiste",
+    rent: per ? "Ahorro" : "Rentabilidad", meta: per ? 0.2 : 0.15,
+    tend: per ? "Tendencia de ingresos" : "Tendencia de ventas",
+    sano: per ? "Tus finanzas están sanas. Cuida que sigan así." : "Tu negocio está sano. Cuida que siga así.",
+  };
+}
 const pct = (v) => (v == null ? "—" : (v * 100).toFixed(1) + "%");
 const NS = "http://www.w3.org/2000/svg";
 
@@ -13,10 +40,11 @@ const lucca = (pose) => (window.__LUCCA__ && window.__LUCCA__[pose]) || "/lucca/
 
 // ---------------------------------------------------------------- datos
 async function cargar() {
-  if (ESTATICO) { E = window.__ESTADO__; mesSel = mesSel || E.mes_actual; render(); vivo(true); return; }
+  if (ESTATICO) { E = window.__ESTADO__; FMT = null; mesSel = mesSel || E.mes_actual; render(); vivo(true); return; }
   try {
     const r = await fetch("/api/estado", { cache: "no-store" });
     E = await r.json();
+    FMT = null;
     version = E.version;
     if (!mesSel || !E.por_mes || !E.por_mes[mesSel]) mesSel = E.mes_actual;
     render();
@@ -110,7 +138,8 @@ function render() {
   const d = E.por_mes[mesSel];
   const nombreMes = E.meses.find((m) => m.mes === mesSel).nombre;
   $("#periodo").textContent = d.es_periodo ? `Periodo de tu estado de cuenta · ${nombreMes} (${d.dias} días)` : "Cierre de " + nombreMes + (d.parcial ? ` · mes incompleto (${d.dias} días)` : "");
-  $("#titulo").textContent = "¿Cómo le fue a " + E.negocio + "?";
+  $("#titulo").textContent = T().titulo;
+  aplicarMarca(); textosUso();
   $("#meses").innerHTML = E.meses.map((m) => `<button class="month" role="tab" aria-selected="${m.mes === mesSel}" data-m="${m.mes}">${esc(m.nombre)}${E.por_mes[m.mes].parcial ? "<small>parcial</small>" : m.periodo ? "<small>periodo</small>" : ""}</button>`).join("");
   document.querySelectorAll(".month").forEach((b) => b.addEventListener("click", () => { mesSel = b.dataset.m; render(); }));
   const prev = mesAnterior();
@@ -145,13 +174,13 @@ function renderVeredicto(d, prev) {
   const txt = { rojo: "Semáforo rojo", ambar: "Semáforo ámbar", verde: "Semáforo verde", info: "Tu resumen" }[nivel];
   const ut = d.utilidad;
   $("#big").textContent = peso(ut);
-  $(".big-l").textContent = d.es_periodo ? "Lo que te quedó en el periodo" : "Lo que te quedó este mes";
+  $(".big-l").textContent = T().big + (d.es_periodo ? " en el periodo" : " este mes");
   $("#big").classList.toggle("neg", ut < 0);
   const c100 = d.ingresos ? (ut / d.ingresos) * 100 : null;
-  $("#big-s").innerHTML = `${c100 != null ? `De cada <b>$100</b> que vendes ${c100 >= 0 ? `te quedan <b>$${c100.toFixed(2)}</b>` : `<b>pierdes $${(-c100).toFixed(2)}</b>`}` : ""} ${delta(ut, prev && prev.utilidad)}`;
+  $("#big-s").innerHTML = `${c100 != null ? `De cada <b>${simb()}100</b> que ${T().vendes} ${c100 >= 0 ? `te quedan <b>${simb()}${c100.toFixed(2)}</b>` : `<b>pierdes ${simb()}${(-c100).toFixed(2)}</b>`}` : ""} ${delta(ut, prev && prev.utilidad)}`;
   $("#veredicto").className = "bubble " + nivel;
   $("#veredicto").innerHTML = `<span class="tag">${txt}</span>
-    ${a ? `<p><b>${esc(a.titulo)}.</b> ${esc(a.accion || a.detalle)}</p>` : `<p>${ut >= 0 ? "Tu operación dejó" : "Tu operación perdió"} <b>${peso(Math.abs(ut))}</b> sobre ventas de ${peso(d.ingresos)}.</p>`}`;
+    ${a ? `<p><b>${esc(a.titulo)}.</b> ${esc(a.accion || a.detalle)}</p>` : `<p>${ut >= 0 ? "Te quedaron" : "Te faltaron"} <b>${peso(Math.abs(ut))}</b> de ${peso(d.ingresos)}.</p>`}`;
   $("#lucca-hero").src = lucca(nivel === "verde" || nivel === "info" ? "pulgar" : nivel === "rojo" ? "libreta" : "cafe");
 }
 
@@ -161,13 +190,13 @@ function salud(d, prev) {
   const dias = E.saldo != null && E.gasto_diario ? E.saldo / E.gasto_diario : null;
   const sinId = d.lineas.filter((l) => l.seccion === "sin_identificar").reduce((s, l) => s + l.monto, 0);
   const f = [
-    ["Rentabilidad", d.utilidad <= 0 ? 0 : lim(((d.margen || 0) / 0.15) * 100), d.margen != null ? pct(d.margen) + " de margen" : "—"],
+    [T().rent, d.utilidad <= 0 ? 0 : lim(((d.margen || 0) / T().meta) * 100), d.margen != null ? pct(d.margen) + (T().per ? " ahorrado" : " de margen") : "—"],
     dias != null ? ["Colchón de caja", lim((dias / 30) * 100), Math.max(0, Math.round(dias)) + (Math.round(dias) === 1 ? " día" : " días")] : null,
     ["Claridad de tus números", d.gastos ? lim((1 - sinId / d.gastos / 0.5) * 100) : 100, d.gastos ? pct(sinId / d.gastos) + " sin identificar" : "—"],
-    prev && prev.ingresos ? ["Tendencia de ventas", lim((((d.ingresos - prev.ingresos) / prev.ingresos + 0.3) / 0.35) * 100), pct((d.ingresos - prev.ingresos) / prev.ingresos) + " vs mes ant."] : null,
+    prev && prev.ingresos ? [T().tend, lim((((d.ingresos - prev.ingresos) / prev.ingresos + 0.3) / 0.35) * 100), pct((d.ingresos - prev.ingresos) / prev.ingresos) + " vs mes ant."] : null,
   ].filter(Boolean);
   const score = Math.round(f.reduce((s, x) => s + x[1], 0) / f.length);
-  const g = score >= 75 ? ["Sólido", "Tu negocio está sano. Cuida que siga así.", "#4fd39b"] : score >= 55 ? ["Estable", "Funciona, pero hay dinero que se te está yendo.", "#03cdd0"]
+  const g = score >= 75 ? ["Sólido", T().sano, "#4fd39b"] : score >= 55 ? ["Estable", "Funciona, pero hay dinero que se te está yendo.", "#03cdd0"]
     : score >= 35 ? ["En riesgo", "Hay focos rojos que conviene atender este mes.", "#ffb648"] : ["Crítico", "Atiende tu plan de acción hoy.", "#ff6b7a"];
   return { score, factores: f, grado: g };
 }
@@ -196,10 +225,14 @@ function renderKpis(d, prev) {
   const hasta = E.tendencia.slice(0, E.tendencia.findIndex((t) => t.mes === mesSel) + 1);
   const serie = (k) => hasta.map((t) => t[k]);
   const k = [
-    ["Vendiste", peso(d.ingresos), "Sin IVA", "marca", delta(d.ingresos, prev && prev.ingresos), spark(serie("ingresos"), "var(--s1)")],
-    ["Gastaste", peso(d.gastos), d.ingresos ? pct(d.gastos / d.ingresos) + " de lo que vendiste" : "", "", delta(d.gastos, prev && prev.gastos, false), spark(serie("gastos"), "var(--s2)")],
+    [T().k1, peso(d.ingresos), T().k1s, "marca", delta(d.ingresos, prev && prev.ingresos), spark(serie("ingresos"), "var(--s1)")],
+    ["Gastaste", peso(d.gastos), d.ingresos ? pct(d.gastos / d.ingresos) + T().deLo : "", "", delta(d.gastos, prev && prev.gastos, false), spark(serie("gastos"), "var(--s2)")],
     ["Tienes en el banco", E.saldo != null ? peso(E.saldo) : "—", dias != null ? `Cubre ${Math.max(0, Math.round(dias))} día${Math.round(dias) === 1 ? "" : "s"} de pagos` : "Sube un PDF para ver tu saldo", dias != null && dias < 15 ? "crit" : dias != null && dias < 30 ? "warn" : "good", "", ""],
-    ["Aparta para el SAT", imp.definido ? peso(imp.total) : "—", imp.definido ? `ISR ${peso(imp.isr)} + IVA ${peso(imp.iva)}` : "Contesta tu régimen fiscal", imp.definido ? "warn" : "", "", ""],
+    T().per
+      ? ["Ahorraste", peso(d.utilidad), d.margen != null ? pct(d.margen) + " de lo que te entró" : "", d.utilidad < 0 ? "crit" : d.margen < 0.1 ? "warn" : "good", delta(d.utilidad, prev && prev.utilidad), spark(serie("utilidad"), "var(--ink)")]
+      : ["Aparta para " + T().aut, imp.definido ? peso(imp.total) : "—",
+         imp.definido ? (imp.solo_consumo ? `${T().imp} por pagar` : `ISR ${peso(imp.isr)} + ${T().imp} ${peso(imp.iva)}`) : (imp.netas ? "Falta tu estado de comisiones" : E.contexto.es_mx ? "Contesta tu régimen fiscal" : "Confírmalo con tu contador"),
+         imp.definido ? "warn" : "", "", ""],
   ];
   $("#kpis").innerHTML = k.map(([l, v, s, c, dl, sp]) => `<div class="kpi ${c}"><span class="l">${l}</span><span class="v">${v}</span><span class="s">${esc(s)}</span>${dl || sp ? `<div class="row">${dl || "<span></span>"}${sp}</div>` : ""}</div>`).join("");
 }
@@ -255,16 +288,58 @@ function pintarSim() {
     <div class="meta">${meta}</div>`;
 }
 
-// ---------------------------------------------------------------- Kaptal
+// ---------------------------------------------------------------- marca y asesor (configurables en marca.json)
+function aplicarMarca() {
+  const m = E.marca || {};
+  document.title = m.producto || "Paccioli CFO";
+  if (m.logo_url) { $(".logo-img").src = m.logo_url; $(".brand-tag").hidden = true; }
+  const c = m.colores || {}, raiz = document.documentElement.style;
+  if (c.principal) { raiz.setProperty("--navy", c.principal); raiz.setProperty("--navy-deep", c.principal); }
+  if (c.acento) { raiz.setProperty("--cyan", c.acento); raiz.setProperty("--accent", c.acento); raiz.setProperty("--s1", c.acento); }
+  if (m.mascota === false) document.querySelectorAll(".mascota").forEach((x) => (x.hidden = true));
+  const a = m.asesor || {}, emp = a.empresa || a.nombre;
+  $("#pie-marca").innerHTML = emp ? `Hecho${a.hecho_en ? " en " + esc(a.hecho_en) : ""} por ${a.web ? `<a href="${esc(a.web)}" target="_blank" rel="noopener">${esc(emp)}</a>` : esc(emp)} · <strong>${esc(m.producto || "")}</strong>` : `<strong>${esc(m.producto || "")}</strong>`;
+  const hay = m.mostrar_asesor !== false && a.nombre && (a.whatsapp || a.correo || a.web);
+  $("#asesor").hidden = !hay;
+  $("#pie-contacto").innerHTML = !hay ? "" : `¿Dudas o algo más especializado? ${esc(a.nombre)}${a.empresa ? ", " + esc(a.empresa) : ""}: ` +
+    [a.whatsapp && `<a href="https://wa.me/${esc(a.whatsapp)}" target="_blank" rel="noopener">WhatsApp ${esc(a.whatsapp_visible || a.whatsapp)}</a>`,
+     a.correo && `<a href="mailto:${esc(a.correo)}">${esc(a.correo)}</a>`, !a.whatsapp && !a.correo && a.web && `<a href="${esc(a.web)}" target="_blank" rel="noopener">${esc(a.web)}</a>`].filter(Boolean).join(" · ");
+}
+function textosUso() {
+  const t = T();
+  $("#t-pregunta").textContent = t.per ? "Ayúdame a entender tus gastos" : t.ind ? "Ayúdame a entender tu trabajo" : "Ayúdame a entender tu negocio";
+  $("#h-clientes").textContent = t.per ? "¿De dónde te entra dinero?" : "¿Quién te paga?";
+  $("#t-clientes").textContent = t.per ? "Lo que te entró este mes, por origen." : "Tus clientes y fuentes de ingreso del mes.";
+  $(".sim").hidden = t.per;  // las palancas de precio y volumen son de negocio
+}
 function renderKaptal(d) {
+  const m = E.marca || {}, a = m.asesor || {}, t = T();
+  if (m.mostrar_asesor === false || !a.nombre) return;
   const nivel = (porNivel(E.alertas)[0] || {}).nivel;
-  const falta = d.ingresos ? 0.15 * d.ingresos - d.utilidad : 0;
-  $("#t-kaptal").textContent = d.utilidad < 0 ? "Estás perdiendo dinero. No lo resuelvas solo."
-    : nivel === "rojo" || nivel === "ambar" ? "Tu negocio funciona, pero te deja poco. Eso se arregla."
-    : "Vas bien. Ahora toca crecer sin pagar de más.";
-  $("#kaptal-txt").innerHTML = falta > 0
-    ? `Este mes te quedaron ${peso(d.utilidad)} de ${peso(d.ingresos)}. Con un margen sano de 15% serían <b>${peso(falta)} más al mes</b>. Un CFO de Kaptal revisa estos números contigo y te dice exactamente qué mover.`
-    : `Tu margen ya está sano. Un CFO de Kaptal te ayuda a planear tus impuestos, proyectar tu crecimiento y decidir dónde invertir.`;
+  const quien = [a.nombre, [a.puesto, a.empresa].filter(Boolean).join(" de ")].filter(Boolean).join(", ") + (a.puesto || a.empresa ? "," : "");
+  $("#asesor-lema").textContent = `${m.producto || "Paccioli CFO"} te dice qué pasa · ${a.empresa || a.nombre} te ayuda a arreglarlo`;
+  const lista = t.per
+    ? ["Un plan para salir de deudas y tarjetas.", "Tu presupuesto y tu meta de ahorro, en números reales.", `Tus impuestos en orden con ${t.aut} si tienes ingresos extra.`]
+    : ["Revisamos tus números contigo y armamos el plan para subir tu margen.", `Planeación fiscal: pagas lo justo a ${t.aut}, a tiempo y sin sorpresas.`, "Tu contabilidad y declaraciones al día, con contadores de verdad."];
+  $("#asesor-lista").innerHTML = lista.map((x) => `<li>${esc(x)}</li>`).join("");
+  if (t.per) {
+    $("#t-kaptal").textContent = d.utilidad < 0 ? "Este mes gastaste más de lo que te entró. Tiene arreglo." : "¿Quieres que tu dinero rinda más?";
+    $("#kaptal-txt").textContent = `${quien} revisa tus números contigo y te arma un plan sencillo.`;
+  } else {
+    const falta = d.ingresos ? 0.15 * d.ingresos - d.utilidad : 0;
+    $("#t-kaptal").textContent = d.utilidad < 0 ? "Estás perdiendo dinero. No lo resuelvas solo."
+      : nivel === "rojo" || nivel === "ambar" ? "Funciona, pero te deja poco. Eso se arregla." : "Vas bien. Ahora toca crecer sin pagar de más.";
+    $("#kaptal-txt").innerHTML = falta > 0
+      ? `Este mes te quedaron ${peso(d.utilidad)} de ${peso(d.ingresos)}. Con un margen sano de 15% serían <b>${peso(falta)} más al mes</b>. ${esc(quien)} revisa estos números contigo y te dice exactamente qué mover.`
+      : `Tu margen ya está sano. ${esc(quien)} te ayuda a planear tus impuestos, proyectar tu crecimiento y decidir dónde invertir.`;
+  }
+  const nombre1 = (a.nombre || "").split(" ")[0];
+  const msj = encodeURIComponent(`Hola ${nombre1}, usé ${m.producto || "Paccioli CFO"} y quiero más información.`);
+  $("#contacto").innerHTML = `<div class="quien"><b>${esc(a.nombre)}</b><span>${esc([a.puesto, a.empresa].filter(Boolean).join(" · "))}</span></div>
+    <p>¿Quieres más información o algo más especializado? Escríbeme directo.</p>
+    ${a.whatsapp ? `<a class="btn cta" href="https://wa.me/${esc(a.whatsapp)}?text=${msj}" target="_blank" rel="noopener">WhatsApp · ${esc(a.whatsapp_visible || a.whatsapp)}</a>` : ""}
+    ${a.correo ? `<a class="btn ${a.whatsapp ? "cta2" : "cta"}" href="mailto:${esc(a.correo)}?subject=${encodeURIComponent((m.producto || "Paccioli CFO") + ": quiero más información")}">${esc(a.correo)}</a>` : ""}
+    ${!a.whatsapp && !a.correo && a.web ? `<a class="btn cta" href="${esc(a.web)}" target="_blank" rel="noopener">Conócenos →</a>` : ""}`;
 }
 
 // una pregunta a la vez para no abrumar; "despues" la manda al final de la fila
@@ -311,7 +386,7 @@ function renderCascada(d) {
   if (resto > 0.5) S.push(["Otros gastos", resto, "d"]);
   S.push(["Utilidad", d.utilidad, "t"]);
   const c100 = d.ingresos ? d.utilidad / d.ingresos * 100 : 0;
-  $("#t-cascada").innerHTML = !d.ingresos ? "" : c100 >= 0 ? `De cada <b>$100</b> que entran te quedan <b>$${c100.toFixed(2)}</b>.` : `De cada <b>$100</b> que entran <b>pierdes $${(-c100).toFixed(2)}</b>.`;
+  $("#t-cascada").innerHTML = !d.ingresos ? "" : c100 >= 0 ? `De cada <b>${simb()}100</b> que entran te quedan <b>${simb()}${c100.toFixed(2)}</b>.` : `De cada <b>${simb()}100</b> que entran <b>pierdes ${simb()}${(-c100).toFixed(2)}</b>.`;
   const box = $("#cascada"); box.innerHTML = "";
   const W = 1100, H = 320, L = 62, R = 10, T = 26, B = 50, pw = W - L - R, ph = H - T - B;
   let rr = 0; const runs = S.map(([, v, k]) => (rr = k === "t" ? v : rr - v));
@@ -389,7 +464,9 @@ function renderER(d) {
   h += row("Gastos de operación", -d.gastos, "tot") + row("UTILIDAD DE OPERACIÓN", d.utilidad, "tot");
   if (d.debajo.length) h += `<tr class="sec"><td colspan="3">Debajo de la línea (no cambian tu utilidad)</td></tr>` + d.debajo.map((l) => row(l.label, l.monto)).join("");
   $("#er").innerHTML = h + "</table>";
-  $("#t-er").textContent = "Ingresos y gastos sin IVA. Tarjetas, créditos, impuestos, préstamos y gastos personales van aparte: no son gasto de la operación.";
+  const t = T();
+  $("#t-er").textContent = t.per ? "Tus ingresos y gastos del mes. Pagos de tarjetas, créditos y traspasos entre tus cuentas van aparte."
+    : `Ingresos y gastos${E.contexto && E.contexto.tasa && E.perfil.precios_iva !== "no_cobro" ? " sin " + t.imp : ""}. Tarjetas, créditos, impuestos, préstamos y gastos personales van aparte: no son gasto de la operación.`;
 }
 
 function renderMovs() {

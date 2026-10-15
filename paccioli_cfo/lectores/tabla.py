@@ -142,7 +142,7 @@ def leer(ruta: str | Path, fuente: str | None = None) -> tuple[list[Movimiento],
     if not movs:
         raise ValueError(f"No encontré movimientos en {ruta.name}: necesito columnas de fecha y cargo/abono (o importe).")
     fechas = sorted(m.fecha for m in movs)
-    resumen = {"periodo": f"DEL {fechas[0]} AL {fechas[-1]}", "sin_saldos": not saldos}
+    resumen = {"periodo": f"DEL {fechas[0]} AL {fechas[-1]}", "periodo_inferido": True, "sin_saldos": not saldos}
     if saldos and len(saldos) == len(movs):
         resumen.update(_cuadre(movs, [x for _, x in saldos]))
     elif saldos:  # saldo solo en algunos renglones (fin de dia): se valida en esos puntos

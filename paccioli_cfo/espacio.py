@@ -12,6 +12,10 @@ from pathlib import Path
 
 PERFIL_VACIO = {
     "nombre_negocio": "",
+    "uso": "",                # negocio | independiente | personal
+    "pais": "",               # MX, CO, PE, CL, AR, ES, US... u "otro"
+    "moneda": "",             # solo si tu pais no esta en la lista (USD, EUR...)
+    "tasa_impuesto": "",      # tu IVA/IGV/VAT si tu pais no esta en la lista (16 o 0.16)
     "titular": "",
     "regimen": "",            # resico | actividad | moral | no_se
     "precios_iva": "",        # incluyen | mas_iva | no_cobro

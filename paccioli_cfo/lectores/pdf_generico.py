@@ -238,6 +238,7 @@ def leer(ruta: str | Path) -> tuple[list[Movimiento], dict]:
         primera = next((l.strip() for l in texto.splitlines() if l.strip()), "")
         banco = re.split(r"[·|,]| - ", primera)[0].strip()[:40] or "PDF"
     res = {"banco": banco.title() if banco.isupper() else banco, "periodo": _periodo(tx, anio) or f"DEL {fechas[0]} AL {fechas[-1]}"}
+    res["periodo_inferido"] = not _periodo(tx, anio)
     rfc = re.search(r"\b([A-Z&Ñ]{3,4}\d{6}[A-Z0-9]{3})\b", tx)
     if rfc:
         res["rfc"] = rfc.group(1)

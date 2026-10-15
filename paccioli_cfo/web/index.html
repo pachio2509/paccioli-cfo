@@ -10,16 +10,16 @@
 <link rel="stylesheet" href="/estilos.css">
 </head>
 <body>
-<div class="drop-overlay" id="overlay" hidden><div><img src="/lucca/lucca-saludo.png" alt="">Suéltalo aquí</div></div>
+<div class="drop-overlay" id="overlay" hidden><div><img src="/lucca/lucca-saludo.png" alt="" class="mascota">Suéltalo aquí</div></div>
 
 <div class="cargando" id="cargando" hidden>
   <div class="cargando-card">
-    <img src="/lucca/lucca-audifonos.png" alt="Lucca trabajando" class="lucca-bob">
+    <img src="/lucca/lucca-audifonos.png" alt="Lucca trabajando" class="lucca-bob mascota">
     <h2>Lucca está leyendo tu estado de cuenta</h2>
     <ol class="pasos" id="pasos">
       <li>Leyendo tus movimientos</li>
       <li>Cuadrando contra el saldo del banco</li>
-      <li>Separando ventas, gastos e IVA</li>
+      <li>Separando ingresos, gastos e impuestos</li>
       <li>Armando tu estado financiero</li>
     </ol>
   </div>
@@ -38,14 +38,14 @@
 <main id="app">
   <section class="empty" id="vacio" hidden>
     <div class="wrap empty-grid">
-      <div class="empty-lucca"><img src="/lucca/lucca-saludo.png" alt="Lucca saludando" class="lucca-bob"></div>
+      <div class="empty-lucca"><img src="/lucca/lucca-saludo.png" alt="Lucca saludando" class="lucca-bob mascota"></div>
       <div class="empty-card">
         <div class="eyebrow">Hola, soy Lucca · tu CFO</div>
-        <h1>Dame tu estado de cuenta y en un minuto te digo cómo va tu negocio.</h1>
+        <h1>Dame tu estado de cuenta y en un minuto te digo cómo van tus números.</h1>
         <ol class="tres">
           <li><b>1</b><span><strong>Descárgalo</strong> de tu banca en línea: el PDF, Excel o CSV de cualquier banco.</span></li>
           <li><b>2</b><span><strong>Arrástralo</strong> aquí abajo.</span></li>
-          <li><b>3</b><span><strong>Listo:</strong> ves cuánto ganaste, cuánto apartar para el SAT y qué arreglar.</span></li>
+          <li><b>3</b><span><strong>Listo:</strong> ves cuánto te entró, cuánto gastaste, cuánto te quedó y qué arreglar.</span></li>
         </ol>
         <label class="dropzone" for="archivo"><strong>Arrastra aquí tu estado de cuenta</strong><span>o haz clic para buscarlo</span></label>
         <p class="privacy">🔒 Tus archivos no salen de tu computadora. Se quedan en <code id="carpeta"></code></p>
@@ -67,7 +67,7 @@
             <div class="big" id="big"></div>
             <div class="big-s" id="big-s"></div>
             <div class="lucca-dice">
-              <img id="lucca-hero" src="/lucca/lucca-pulgar.png" alt="Lucca">
+              <img id="lucca-hero" src="/lucca/lucca-pulgar.png" alt="Lucca" class="mascota">
               <div class="bubble" id="veredicto"></div>
             </div>
           </div>
@@ -92,7 +92,7 @@
           </section>
           <section class="card pregunta-card" aria-labelledby="t-pregunta">
             <div class="pregunta-head">
-              <img src="/lucca/lucca-libreta.png" alt="" class="lucca-mini">
+              <img src="/lucca/lucca-libreta.png" alt="" class="lucca-mini mascota">
               <div><h2 id="t-pregunta">Ayúdame a entender tu negocio</h2><p class="take" id="q-prog"></p></div>
             </div>
             <div id="preguntas"></div>
@@ -114,24 +114,15 @@
           </div>
         </section>
 
-        <section class="kaptal" aria-labelledby="t-kaptal">
-          <img src="/lucca/lucca-cafe.png" alt="" class="kaptal-lucca">
+        <section class="kaptal" id="asesor" aria-labelledby="t-kaptal">
+          <img src="/lucca/lucca-cafe.png" alt="" class="kaptal-lucca mascota">
           <div>
-            <div class="eyebrow">Paccioli te dice qué pasa · Kaptal te ayuda a arreglarlo</div>
+            <div class="eyebrow" id="asesor-lema"></div>
             <h2 id="t-kaptal"></h2>
             <p id="kaptal-txt"></p>
-            <ul>
-              <li>Revisamos tus números contigo y armamos el plan para subir tu margen.</li>
-              <li>Planeación fiscal: pagas lo justo al SAT, a tiempo y sin sorpresas.</li>
-              <li>Tu contabilidad, declaraciones y nómina al día, con contadores de verdad.</li>
-            </ul>
+            <ul id="asesor-lista"></ul>
           </div>
-          <div class="contacto">
-            <div class="quien"><b>Jorge Ayala</b><span>CFO · Kaptal</span></div>
-            <p>¿Quieres más información o algo más especializado para tu empresa? Escríbeme directo.</p>
-            <a class="btn cta" href="https://wa.me/529991750122?text=Hola%20Jorge%2C%20us%C3%A9%20Paccioli%20CFO%20y%20quiero%20m%C3%A1s%20informaci%C3%B3n." target="_blank" rel="noopener">WhatsApp · 999 175 0122</a>
-            <a class="btn cta2" href="mailto:jorge@kaptal.com.mx?subject=Paccioli%20CFO%3A%20quiero%20m%C3%A1s%20informaci%C3%B3n">jorge@kaptal.com.mx</a>
-          </div>
+          <div class="contacto" id="contacto"></div>
         </section>
       </div>
 
@@ -150,13 +141,13 @@
             <div class="legend"><span><i class="sw s1"></i>Ingresos</span><span><i class="sw s2"></i>Gastos</span><span><i class="sw line"></i>Utilidad</span></div>
           </section>
           <section class="card">
-            <h2>¿Quién te paga?</h2>
-            <p class="take">Tus clientes y fuentes de ingreso del mes (con IVA).</p>
+            <h2 id="h-clientes">¿Quién te paga?</h2>
+            <p class="take" id="t-clientes">Tus clientes y fuentes de ingreso del mes.</p>
             <div id="clientes" class="chart"></div>
           </section>
           <section class="card">
             <h2>¿En qué se va tu dinero?</h2>
-            <p class="take">Todo lo que salió del banco, por concepto (con IVA).</p>
+            <p class="take">Todo lo que salió del banco, por concepto.</p>
             <div id="gastos" class="chart"></div>
           </section>
           <section class="card wide">
@@ -181,9 +172,9 @@
 </main>
 
 <footer class="foot">
-  <div>🔒 Tus datos nunca salen de tu computadora. Paccioli CFO lee tus archivos de forma local.</div>
-  <div>Estimaciones informativas: no sustituyen a tu contador. Hecho en Mérida por <a href="https://kaptal.com.mx" target="_blank" rel="noopener">Kaptal</a> · <strong>Paccioli</strong> <span id="ver"></span></div>
-  <div>¿Dudas o algo más especializado? Jorge Ayala, Kaptal: <a href="https://wa.me/529991750122" target="_blank" rel="noopener">WhatsApp 999 175 0122</a> · <a href="mailto:jorge@kaptal.com.mx">jorge@kaptal.com.mx</a></div>
+  <div>🔒 Tus datos nunca salen de tu computadora: se leen de forma local.</div>
+  <div>Estimaciones informativas: no sustituyen a tu contador. <span id="pie-marca"></span> <span id="ver"></span></div>
+  <div id="pie-contacto"></div>
 </footer>
 <div class="toast" id="toast" hidden></div>
 <div class="tip" id="tip" hidden></div>

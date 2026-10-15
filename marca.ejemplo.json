@@ -1,0 +1,17 @@
+{
+  "producto": "CFO de Despacho Ejemplo",
+  "mostrar_asesor": true,
+  "asesor": {
+    "nombre": "Ana Pérez",
+    "puesto": "Contadora",
+    "empresa": "Despacho Ejemplo",
+    "whatsapp": "5215500000000",
+    "whatsapp_visible": "55 0000 0000",
+    "correo": "hola@despacho-ejemplo.com",
+    "web": "https://despacho-ejemplo.com",
+    "hecho_en": "Monterrey"
+  },
+  "mascota": true,
+  "logo": "mi-logo.png",
+  "colores": { "principal": "#0b2a4a", "acento": "#22c55e" }
+}

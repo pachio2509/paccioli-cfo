@@ -30,6 +30,13 @@ def html(estado: dict) -> str:
 
     # las poses de Lucca se arman en JS ("/lucca/lucca-" + pose + ".png"): se pasan como mapa
     poses = {Path(r).stem.replace("lucca-", ""): u for r, u in imagenes.items() if "/lucca/" in r}
+    from . import marca as mod_marca
+    logo = mod_marca.ruta_logo(mod_marca.cargar())
+    if logo and estado.get("marca"):
+        tipo = {".jpg": "jpeg", ".jpeg": "jpeg", ".webp": "webp", ".svg": "svg+xml"}.get(logo.suffix.lower(), "png")
+        estado = {**estado, "marca": {**estado["marca"], "logo_url": f"data:image/{tipo};base64," + base64.b64encode(logo.read_bytes()).decode()}}
+    from . import __version__
+    estado = {**estado, "app": __version__}
     datos = json.dumps(estado, ensure_ascii=False).replace("</", "<\\/")
     pagina = pagina.replace('<link rel="stylesheet" href="/estilos.css">', f"<style>{css}</style>")
     pagina = pagina.replace('<script src="/app.js"></script>',

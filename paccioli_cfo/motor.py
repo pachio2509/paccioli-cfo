@@ -13,12 +13,11 @@ from collections import defaultdict
 from pathlib import Path
 
 from . import alertas as mod_alertas
-from . import fiscal, lectores, preguntas
+from . import fiscal, lectores, marca, paises, preguntas
 from .categorias import CATEGORIAS
 from .clasificador import clasificar, seccion
 from .espacio import Espacio
 
-IVA = fiscal.IVA
 OPERACION = ("ventas", "otros_ingresos", "costo", "gasto_venta", "gasto_admin")
 MESES = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
 
@@ -85,6 +84,7 @@ def analizar(espacio: Espacio, hoy: dt.date | None = None) -> dict:
             saldos.append((fin, res["saldo_final"], res.get("banco", "")))
         archivos.append({"nombre": p.name, "banco": res.get("banco", "Archivo"), "periodo": res.get("periodo", ""),
                          "titular": res.get("titular"), "rfc": res.get("rfc"), "movimientos": nuevos, "validacion": val,
+                         "periodo_inferido": bool(res.get("periodo_inferido")),
                          "saldo_final": res.get("saldo_final")})
     if titular and not perfil.get("titular"):
         perfil = espacio.guardar_perfil({"titular": titular})
@@ -111,8 +111,11 @@ def analizar(espacio: Espacio, hoy: dt.date | None = None) -> dict:
         ultimo = candidatos[-1] if candidatos else None
     dias_tot = sum(cobertura.values()) or 1
     salidas_tot = sum(m.cargo for m in movs if seccion(m) != "traspaso")
+    ctx = paises.contexto(perfil)
     estado = {
-        "negocio": perfil.get("nombre_negocio") or (titular or "Tu negocio").title(),
+        "negocio": perfil.get("nombre_negocio") or (titular or ("Tus finanzas" if ctx["uso"] == "personal" else "Tu negocio")).title(),
+        "contexto": ctx,
+        "marca": marca.publica(marca.cargar()),
         "perfil": perfil,
         "carpeta": str(espacio.estados),
         "es_demo": espacio.es_demo,
@@ -126,8 +129,8 @@ def analizar(espacio: Espacio, hoy: dt.date | None = None) -> dict:
         "mes_actual": ultimo,
         "gasto_diario": round(salidas_tot / dias_tot, 2),
         "proximo_vencimiento": fiscal.proximo_vencimiento(hoy).isoformat(),
-        "movimientos": [dict(m.to_dict(), etiqueta=CATEGORIAS[m.categoria]["label"], seccion=seccion(m)) for m in movs],
-        "categorias": {k: v["label"] for k, v in CATEGORIAS.items()},
+        "movimientos": [dict(m.to_dict(), etiqueta=_etiqueta(m.categoria, ctx), seccion=seccion(m)) for m in movs],
+        "categorias": {k: _etiqueta(k, ctx) for k, v in CATEGORIAS.items() if not v.get("virtual")},
     }
     estado["preguntas"] = preguntas.generar(movs, perfil, estado)
     estado["alertas"] = mod_alertas.generar(estado, ultimo, hoy)
@@ -148,8 +151,8 @@ def _periodos(archivos, movs, perfil) -> list[tuple[str, dict, str]]:
     out, vistos = [], set()
     for f in archivos:
         pts = _fechas_periodo(f.get("periodo"))
-        if len(pts) < 2:
-            continue
+        if len(pts) < 2 or f.get("periodo_inferido"):
+            continue  # solo cuando el banco imprime su periodo de corte; no por las fechas de los movimientos
         ini, fin = pts[0], pts[-1]
         sig = fin + dt.timedelta(days=1)
         if ini.day == 1 and sig.day == 1:
@@ -204,16 +207,33 @@ def _aplicar_decisiones(movs, perfil):
                 m.categoria, m.regla = destino[perfil[campo]], f"tu respuesta: {campo}"
 
 
+# en finanzas personales las mismas categorias se leen distinto
+ETIQUETAS_PERSONAL = {"ventas": "Dinero que recibes", "ventas_tarjeta": "Cobros con terminal", "ventas_plataforma": "Cobros en plataformas",
+                      "personal": "Gastos personales", "efectivo": "Retiros en efectivo", "otros_gastos": "Otros gastos",
+                      "nomina": "Pagos a personas", "proveedores": "Compras", "consumos": "Comidas y súper"}
+
+
+def _etiqueta(cat: str, ctx: dict) -> str:
+    if ctx["uso"] == "personal" and cat in ETIQUETAS_PERSONAL:
+        return ETIQUETAS_PERSONAL[cat]
+    return CATEGORIAS[cat]["label"]
+
+
 def _separa_iva(perfil) -> bool:
-    return perfil.get("precios_iva") != "no_cobro"
+    ctx = paises.contexto(perfil)
+    return perfil.get("precios_iva") != "no_cobro" and ctx["tasa"] > 0 and ctx["uso"] != "personal"
 
 
 def _mes(movs, perfil) -> dict:
+    ctx = paises.contexto(perfil)
+    IVA = ctx["tasa"]
     sep = _separa_iva(perfil)
+    personal = ctx["uso"] == "personal"
+    gasto_extra = ("personal",) if personal else ()  # en finanzas personales, tus gastos personales SON tus gastos
     lineas: dict[str, float] = defaultdict(float)
     for m in movs:
         c = CATEGORIAS[m.categoria]
-        if c["seccion"] not in OPERACION + ("sin_identificar",):
+        if c["seccion"] not in OPERACION + ("sin_identificar",) + gasto_extra:
             continue  # lo que no sé qué es cuenta como gasto (criterio conservador) hasta que me contestes
         monto = m.abono - m.cargo if c["seccion"] in ("ventas", "otros_ingresos") else m.cargo - m.abono
         if sep and c.get("iva"):
@@ -227,7 +247,7 @@ def _mes(movs, perfil) -> dict:
     ventas = sec("ventas") + (externo / (1 + IVA) if sep else externo)
     otros = sec("otros_ingresos")
     ingresos = ventas + otros
-    costo, gv, ga = sec("costo"), sec("gasto_venta"), sec("gasto_admin") + sec("sin_identificar")
+    costo, gv, ga = sec("costo"), sec("gasto_venta"), sec("gasto_admin") + sec("sin_identificar") + (sec("personal") if personal else 0)
     gastos = costo + gv + ga
     utilidad = ingresos - gastos
     variables = sum(v for k, v in lineas.items() if CATEGORIAS[k].get("variable"))
@@ -239,7 +259,7 @@ def _mes(movs, perfil) -> dict:
     salidas = sum(m.cargo for m in movs if seccion(m) != "traspaso")
     abajo = defaultdict(float)
     for m in movs:
-        if seccion(m) in ("financiero", "personal", "aportacion"):
+        if seccion(m) in ("financiero", "aportacion") + (() if personal else ("personal",)):
             abajo[m.categoria] += m.importe
     if mitad_tarjetas:
         abajo["tarjetas"] += mitad_tarjetas
@@ -252,13 +272,13 @@ def _mes(movs, perfil) -> dict:
     gastos_cat = defaultdict(float)
     for m in movs:
         if m.cargo and seccion(m) not in ("traspaso",):
-            gastos_cat[CATEGORIAS[m.categoria]["label"]] += m.cargo
+            gastos_cat[_etiqueta(m.categoria, ctx)] += m.cargo
     iva_cobrado = sum(m.abono * IVA / (1 + IVA) for m in movs if seccion(m) == "ventas" and CATEGORIAS[m.categoria].get("iva")) if sep else 0
     netas = sum(m.abono for m in movs if m.categoria == "comisiones_netas")
     iva_pagado = (sum(m.cargo * IVA / (1 + IVA) for m in movs if seccion(m) in OPERACION and CATEGORIAS[m.categoria].get("iva"))
                   + sum(m.cargo for m in movs if seccion(m) == "iva")) if sep else 0
     impuestos_pagados = sum(m.cargo for m in movs if m.categoria == "impuestos")
-    filas = [{"categoria": k, "label": CATEGORIAS[k]["label"], "seccion": CATEGORIAS[k]["seccion"], "monto": round(v, 2)}
+    filas = [{"categoria": k, "label": _etiqueta(k, ctx), "seccion": CATEGORIAS[k]["seccion"] if CATEGORIAS[k]["seccion"] != "personal" else "gasto_admin", "monto": round(v, 2)}
              for k, v in sorted(lineas.items(), key=lambda kv: -abs(kv[1]))]
     if externo:
         filas.insert(0, {"categoria": "externo", "label": "Ingresos fuera de esta cuenta (tu estimado)", "seccion": "ventas",
@@ -271,7 +291,7 @@ def _mes(movs, perfil) -> dict:
         "equilibrio": round(pe, 2) if pe else None, "margen_contribucion": round(mc, 4),
         "entradas": round(entradas, 2), "salidas": round(salidas, 2), "flujo": round(entradas - salidas, 2),
         "lineas": filas,
-        "debajo": [{"categoria": k, "label": CATEGORIAS[k]["label"], "monto": round(v, 2)} for k, v in sorted(abajo.items(), key=lambda kv: kv[1])],
+        "debajo": [{"categoria": k, "label": _etiqueta(k, ctx), "monto": round(v, 2)} for k, v in sorted(abajo.items(), key=lambda kv: kv[1])],
         "clientes": [{"nombre": k, "monto": round(v, 2), "canal": canal.get(k, False)} for k, v in sorted(clientes.items(), key=lambda kv: -kv[1])],
         "gastos_categoria": [{"nombre": k, "monto": round(v, 2)} for k, v in sorted(gastos_cat.items(), key=lambda kv: -kv[1])],
         "iva": {"cobrado": round(iva_cobrado, 2), "pagado": round(iva_pagado, 2), "neto": round(iva_cobrado - iva_pagado, 2)},
@@ -286,12 +306,21 @@ def _mes(movs, perfil) -> dict:
 
 def _impuestos(ventas, ingresos, gastos, utilidad, iva_neto, perfil, netas=0.0) -> dict:
     reg = perfil.get("regimen") or ""
+    ctx = paises.contexto(perfil)
+    if ctx["uso"] == "personal":
+        return {"definido": False, "personal": True, "texto": "En tus finanzas personales no estimo impuestos."}
     if netas and netas >= 0.3 * max(ingresos, 1):
         # la aseguradora o promotoria ya retuvo ISR e IVA: sin su estado de comisiones cualquier estimado sale mal
         return {"definido": False, "netas": True,
                 "texto": f"Cobraste {netas:,.0f} de comisiones que llegan netas: ya te retuvieron ISR e IVA. "
                          "Para estimar tus impuestos necesito tu estado de comisiones (bruto, ISR e IVA retenidos)."}
     iva = max(iva_neto, 0) if _separa_iva(perfil) else 0
+    if not ctx["es_mx"]:
+        if not iva:
+            return {"definido": False, "texto": f"Fuera de México no estimo el impuesto sobre la renta: confírmalo con tu contador."}
+        return {"definido": True, "isr": 0.0, "iva": round(iva, 2), "total": round(iva, 2), "solo_consumo": True,
+                "texto": f"{ctx['impuesto']} por pagar a {ctx['autoridad']}: lo que cobraste menos lo que pagaste. "
+                         "El impuesto sobre la renta depende de tu régimen: confírmalo con tu contador."}
     if reg == "resico":
         isr = fiscal.isr_resico_pf(ingresos)
         texto = f"RESICO: {isr['tasa']:.2%} sobre lo que cobraste, sin deducciones."
@@ -310,10 +339,13 @@ def _impuestos(ventas, ingresos, gastos, utilidad, iva_neto, perfil, netas=0.0) 
 
 def _supuestos(perfil) -> list[str]:
     s = []
-    if not perfil.get("precios_iva"):
-        s.append("Supuse que tus precios incluyen IVA: separé el 16% de tus ventas y gastos.")
+    ctx = paises.contexto(perfil)
+    if ctx["uso"] == "personal":
+        return ["Finanzas personales: las cifras van completas, sin separar impuestos."]
+    if not perfil.get("precios_iva") and ctx["tasa"]:
+        s.append(f"Supuse que tus precios incluyen {ctx['impuesto']}: separé el {ctx['tasa']:.0%} de tus ventas y gastos.")
     if perfil.get("precios_iva") == "no_cobro":
-        s.append("No cobras IVA: todas las cifras van completas.")
+        s.append(f"No cobras {ctx['impuesto']}: todas las cifras van completas.")
     if not perfil.get("cuenta"):
         s.append("No sé si esta cuenta es solo del negocio: contesta para separar gastos personales.")
     return s

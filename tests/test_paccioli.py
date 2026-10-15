@@ -152,13 +152,18 @@ def test_tarjetas_por_desglosar_quedan_aparte_y_mitad_y_mitad(tmp_path):
 
 
 def test_estado_que_no_corta_en_mes_calendario(tmp_path):
-    esp = _csv(tmp_path, ["07/09/2026,VENTA CLIENTE SA DE CV,,1160,1160", "20/09/2026,VENTA CLIENTE SA DE CV,,1160,2320",
-                          "06/10/2026,VENTA CLIENTE SA DE CV,,1160,3480"])
+    esp = Espacio(tmp_path)
+    shutil.copy(RAIZ / "tests" / "fixtures" / "banco-importe-con-signo.pdf", esp.estados / "banco.pdf")  # periodo 15 sep - 14 oct
     e = motor.analizar(esp, HOY)
     periodos = [m for m in e["meses"] if m.get("periodo")]
     assert len(periodos) == 1 and e["mes_actual"] == periodos[0]["mes"]
-    assert e["por_mes"][e["mes_actual"]]["ingresos"] == pytest.approx(3000)
+    assert e["por_mes"][e["mes_actual"]]["dias"] == 30
     assert any("mes calendario" in a["titulo"] for a in e["alertas"])
+
+
+def test_csv_que_termina_antes_de_fin_de_mes_no_es_periodo(tmp_path):
+    esp = _csv(tmp_path, ["01/09/2026,VENTA CLIENTE SA DE CV,,1160,1160", "28/09/2026,VENTA CLIENTE SA DE CV,,1160,2320"])
+    assert not [m for m in motor.analizar(esp, HOY)["meses"] if m.get("periodo")]
 
 
 def test_avisa_si_mezclas_dos_titulares(demo):
@@ -193,3 +198,55 @@ def test_pdf_otro_banco_importe_con_signo_y_fechas_con_mes():
     assert [(m.fecha, m.cargo, m.abono) for m in movs] == [
         ("2026-09-16", 0.0, 4500.5), ("2026-09-20", 1250.25, 0.0), ("2026-10-01", 6000.0, 0.0), ("2026-10-10", 0.0, 7749.75)]
     assert res["cuadre_saldos"] is True and res["periodo"] == "DEL 15/09/2026 AL 14/10/2026"
+
+
+# ---------- para cualquiera: pais, tipo de usuario y marca
+
+def test_otro_pais_usa_su_impuesto_y_su_moneda(tmp_path):
+    esp = _csv(tmp_path, ["01/09/2026,SALDO,,,1000", "05/09/2026,VENTA CLIENTE SAC,,11800,12800", "10/09/2026,PAGO RENTA LOCAL,5900,,6900"])
+    preguntas.responder(esp, "perfil:pais", "PE")
+    e = motor.analizar(esp, HOY)
+    d = e["por_mes"]["2026-09"]
+    assert e["contexto"]["moneda"] == "PEN" and e["contexto"]["impuesto"] == "IGV"
+    assert d["ingresos"] == pytest.approx(10000)  # 18% de IGV separado
+    assert d["impuestos"]["solo_consumo"] and d["impuestos"]["iva"] == pytest.approx(1800 - 900)
+    assert "perfil:regimen" not in [q["id"] for q in e["preguntas"]]  # RESICO es solo de Mexico
+    assert any("S/" in a["titulo"] or "SUNAT" in a["titulo"] for a in e["alertas"])
+
+
+def test_pais_no_listado_pregunta_moneda_y_tasa(tmp_path):
+    esp = _csv(tmp_path, ["05/09/2026,VENTA,,1000,1000"])
+    preguntas.responder(esp, "perfil:pais", "otro")
+    assert "perfil:moneda" in [q["id"] for q in motor.analizar(esp, HOY)["preguntas"]]
+    preguntas.responder(esp, "perfil:moneda", "brl")
+    assert "perfil:tasa_impuesto" in [q["id"] for q in motor.analizar(esp, HOY)["preguntas"]]
+    preguntas.responder(esp, "perfil:tasa_impuesto", "10")
+    e = motor.analizar(esp, HOY)
+    assert e["contexto"]["moneda"] == "BRL" and e["contexto"]["tasa"] == pytest.approx(0.10)
+
+
+def test_finanzas_personales(tmp_path):
+    esp = _csv(tmp_path, ["01/09/2026,SALDO,,,5000", "01/09/2026,DEPOSITO NOMINA EMPRESA SA DE CV,,20000,25000",
+                          "05/09/2026,WALMART SUPERCENTER,3000,,22000", "06/09/2026,RETIRO CAJERO,2000,,20000"])
+    preguntas.responder(esp, "perfil:uso", "personal")
+    e = motor.analizar(esp, HOY)
+    d = e["por_mes"]["2026-09"]
+    assert d["ingresos"] == pytest.approx(20000)  # el sueldo no pierde IVA
+    assert d["gastos"] == pytest.approx(5000)      # super y efectivo SI son gastos personales
+    assert d["impuestos"].get("personal")
+    ids = [q["id"] for q in e["preguntas"]]
+    assert "perfil:regimen" not in ids and "perfil:precios_iva" not in ids
+    assert any(a["titulo"].startswith("Ahorraste") for a in e["alertas"])
+
+
+def test_marca_de_un_despacho(tmp_path, monkeypatch):
+    import json
+    from paccioli_cfo import marca
+    f = tmp_path / "marca.json"
+    f.write_text(json.dumps({"producto": "CFO Despacho X", "asesor": {"nombre": "Ana", "correo": "ana@x.com"}}), encoding="utf-8")
+    monkeypatch.setenv("PACCIOLI_MARCA", str(f))
+    m = marca.cargar()
+    assert m["producto"] == "CFO Despacho X" and m["asesor"]["correo"] == "ana@x.com"
+    assert m["asesor"]["whatsapp"] == ""  # no hereda el contacto de nadie mas
+    monkeypatch.delenv("PACCIOLI_MARCA")
+    assert marca.cargar()["asesor"]["empresa"] == "Kaptal"

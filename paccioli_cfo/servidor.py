@@ -23,7 +23,7 @@ from .lectores import SOPORTADOS
 
 WEB = Path(__file__).parent / "web"
 TIPOS = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
-         ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png"}
+         ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp"}
 
 
 class Estado:
@@ -92,7 +92,13 @@ def crear_handler(estado: Estado):
                 return self._json({"version": estado.version})
             nombre = "index.html" if u.path in ("/", "") else u.path.lstrip("/")
             ruta = (WEB / nombre).resolve()
-            if WEB.resolve() not in ruta.parents or not ruta.is_file():
+            if u.path == "/marca/logo":  # el logo de tu marca (marca.json)
+                from . import marca
+                ruta = marca.ruta_logo(marca.cargar())
+                permitido = ruta is not None
+            else:
+                permitido = WEB.resolve() in ruta.parents and ruta.is_file()
+            if not permitido:
                 self.send_error(404)
                 return
             b = ruta.read_bytes()
