@@ -19,15 +19,16 @@ La persona que te habla probablemente **no sabe contabilidad ni usa la terminal*
 
 ## Paso 1 · Prepara el programa
 
-El programa viene dentro de este skill, en `paccioli_cfo/`. Ubica la carpeta del skill (donde está este archivo) y úsala como `PYTHONPATH`:
+El programa viene dentro de este skill, en `paccioli_cfo/`. Ubica la carpeta del skill (donde está este archivo). `preparar.sh` deja listo un Python con lo necesario sin tocar el del sistema (en Mac moderno `pip install` directo falla) e imprime su ruta:
 
 ```bash
 SKILL="<carpeta de este skill>"
-pip install -q pdfplumber openpyxl 2>/dev/null || pip install -q --user pdfplumber openpyxl
+PY=$(bash "$SKILL/preparar.sh")
 export PYTHONPATH="$SKILL"
+"$PY" -m paccioli_cfo --help
 ```
 
-Si la persona ya tiene Paccioli CFO instalado en su computadora (carpeta `paccioli-cfo` con `.venv`), usa ese: `./.venv/bin/python -m paccioli_cfo`.
+Usa siempre `"$PY" -m paccioli_cfo ...` en los pasos que siguen. Si la persona ya tiene Paccioli CFO instalado en su computadora (carpeta `paccioli-cfo` con `.venv`), puedes usar ese: `./.venv/bin/python -m paccioli_cfo`.
 
 ## Paso 2 · Crea su espacio y pon sus archivos
 
@@ -35,7 +36,7 @@ Si la persona ya tiene Paccioli CFO instalado en su computadora (carpeta `paccio
 NEG="$HOME/Paccioli/<nombre-del-negocio>"      # en claude.ai usa una carpeta de trabajo, p. ej. /tmp/paccioli/<negocio>
 mkdir -p "$NEG/mis-estados-de-cuenta"
 cp <archivos que te dio> "$NEG/mis-estados-de-cuenta/"
-python -m paccioli_cfo resumen --carpeta "$NEG"
+"$PY" -m paccioli_cfo resumen --carpeta "$NEG"
 ```
 
 Una carpeta por negocio. Si te dan estados de **dos personas o empresas distintas**, sepáralos en dos carpetas.
@@ -67,7 +68,7 @@ Fecha,Concepto,Cargo,Abono,Saldo
 ## Paso 4 · Hazle las preguntas importantes
 
 ```bash
-python -m paccioli_cfo preguntas --carpeta "$NEG"
+"$PY" -m paccioli_cfo preguntas --carpeta "$NEG"
 ```
 
 Devuelve una lista con `id`, `titulo` y `opciones`. Pregúntale **máximo 3 a la vez**, en sus palabras. Siempre empieza por:
@@ -79,7 +80,7 @@ Después, en negocios: régimen fiscal (solo México), si cobra con impuesto inc
 Para cada respuesta:
 
 ```bash
-python -m paccioli_cfo responder "<id>" "<valor de la opcion>" --carpeta "$NEG"
+"$PY" -m paccioli_cfo responder "<id>" "<valor de la opcion>" --carpeta "$NEG"
 ```
 
 Guías para que no se equivoque:
@@ -90,16 +91,18 @@ Guías para que no se equivoque:
 
 ## Paso 5 · Entrégale su tablero
 
-**Si estás en su computadora (Claude Code):** abre el tablero en vivo.
+**Si estás en su computadora (Claude Code):** abre el tablero en vivo. Córrelo en segundo plano (no termina solo: es un servidor local) y abre el navegador él mismo.
 
 ```bash
-python -m paccioli_cfo --carpeta "$NEG"
+"$PY" -m paccioli_cfo --carpeta "$NEG"
 ```
+
+Si sueltas un archivo en el tablero del demo (`--demo`), se pasa solo a la carpeta real: no hay que cerrar nada.
 
 **Si estás en claude.ai o no puedes abrir un navegador:** genera el tablero en un solo archivo y entrégaselo para descargar.
 
 ```bash
-python -m paccioli_cfo exportar --carpeta "$NEG" --salida "<carpeta de salida>/tablero-<negocio>.html"
+"$PY" -m paccioli_cfo exportar --carpeta "$NEG" --salida "<carpeta de salida>/tablero-<negocio>.html"
 ```
 
 El archivo se abre con doble clic, sin internet. Lleva sus números adentro: dile que lo comparta solo con quien quiera.

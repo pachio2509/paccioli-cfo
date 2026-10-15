@@ -103,7 +103,8 @@ def main(argv=None) -> int:
         return 0
 
     from .servidor import iniciar
-    iniciar(carpeta, a.puerto, abrir=not a.no_abrir)
+    # en el demo, si sueltas un estado de cuenta tuyo, el tablero se pasa solo a tu carpeta real
+    iniciar(carpeta, a.puerto, abrir=not a.no_abrir, carpeta_real=Path(a.carpeta or RAIZ) if a.demo else None)
     return 0
 
 

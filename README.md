@@ -60,7 +60,7 @@ Se instala, te deja un acceso **«Paccioli CFO»** en tu Escritorio y abre tu ta
 git clone https://github.com/pachio2509/paccioli-cfo.git && cd paccioli-cfo && ./iniciar.sh
 ```
 
-> ¿Quieres verlo antes de usar tus datos? Corre `./iniciar.sh --demo` (o `iniciar.bat --demo`) y juega con **Café La Ceiba**, un negocio de ejemplo.
+> ¿Quieres verlo antes de usar tus datos? Corre `./iniciar.sh --demo` (o `iniciar.bat --demo`) y juega con **Café La Ceiba**, un negocio de ejemplo. Cuando quieras, suelta ahí mismo tu estado de cuenta: el tablero deja el demo y pasa a tus números.
 
 ### Después: suelta tu estado de cuenta
 

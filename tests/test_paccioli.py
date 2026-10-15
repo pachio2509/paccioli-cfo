@@ -250,3 +250,16 @@ def test_marca_de_un_despacho(tmp_path, monkeypatch):
     assert m["asesor"]["whatsapp"] == ""  # no hereda el contacto de nadie mas
     monkeypatch.delenv("PACCIOLI_MARCA")
     assert marca.cargar()["asesor"]["empresa"] == "Kaptal"
+
+
+def test_subir_archivo_en_el_demo_pasa_al_espacio_real(tmp_path):
+    from paccioli_cfo.servidor import Estado
+    demo = Espacio(tmp_path / "demo")
+    (demo.datos / ".demo").touch()
+    real = Espacio(tmp_path / "real")
+    estado = Estado(demo, real)
+    assert estado.espacio.es_demo
+    assert estado.salir_del_demo() is real
+    assert not estado.espacio.es_demo
+    # sin espacio real (sin --demo) no cambia nada
+    assert Estado(real).salir_del_demo() is real

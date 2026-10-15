@@ -29,12 +29,23 @@ TIPOS = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=u
 class Estado:
     """Cachea el analisis y lo recalcula solo cuando cambian tus archivos o respuestas."""
 
-    def __init__(self, espacio: Espacio):
+    def __init__(self, espacio: Espacio, espacio_real: Espacio | None = None):
         self.espacio = espacio
+        self.espacio_real = espacio_real  # a donde se cambia el tablero si sueltas un archivo tuyo en el demo
         self.lock = threading.Lock()
         self.firma = None
         self.datos = None
         self.version = "0"
+
+    def salir_del_demo(self) -> Espacio:
+        """Cambia del negocio de ejemplo a tu espacio real sin cerrar el tablero."""
+        with self.lock:
+            if self.espacio.es_demo and self.espacio_real is not None:
+                self.espacio = self.espacio_real
+                self.firma = None
+                self.datos = None
+                print(f"  → Saliste del demo. Tus estados de cuenta van en: {self.espacio.estados}")
+            return self.espacio
 
     def obtener(self) -> dict:
         with self.lock:
@@ -116,13 +127,17 @@ def crear_handler(estado: Estado):
                 if u.path == "/api/subir":
                     nombre = unquote(parse_qs(u.query).get("nombre", ["estado.pdf"])[0])
                     nombre = re.sub(r"[^\w.\- ]", "_", Path(nombre).name)[:120]
-                    if esp.es_demo:
-                        return self._json({"ok": False, "error": "Estás en el demo de Café La Ceiba. Para usar tus datos, cierra esta ventana y abre Paccioli CFO sin --demo: ./iniciar.sh"}, 400)
                     if Path(nombre).suffix.lower() not in SOPORTADOS:
                         return self._json({"ok": False, "error": "Sube el PDF, Excel o CSV de tu estado de cuenta."}, 400)
-                    destino = esp.estados / nombre
-                    destino.write_bytes(self._cuerpo())
-                    return self._json({"ok": True, "archivo": nombre})
+                    cuerpo = self._cuerpo()
+                    # un archivo tuyo en el demo no se mezcla con Café La Ceiba: el tablero se pasa solo a tu espacio
+                    salio_demo = esp.es_demo and estado.espacio_real is not None
+                    if salio_demo:
+                        esp = estado.salir_del_demo()
+                    if esp.es_demo:
+                        return self._json({"ok": False, "error": "Estás en el demo de Café La Ceiba. Abre Paccioli CFO sin --demo para usar tus datos."}, 400)
+                    (esp.estados / nombre).write_bytes(cuerpo)
+                    return self._json({"ok": True, "archivo": nombre, "salio_demo": salio_demo})
                 datos = json.loads(self._cuerpo() or b"{}")
                 if u.path == "/api/responder":
                     preguntas.responder(esp, datos["id"], datos["valor"])
@@ -144,9 +159,9 @@ def crear_handler(estado: Estado):
     return H
 
 
-def iniciar(carpeta: str | Path, puerto: int = 8765, abrir: bool = True) -> None:
+def iniciar(carpeta: str | Path, puerto: int = 8765, abrir: bool = True, carpeta_real: str | Path | None = None) -> None:
     esp = Espacio(carpeta)
-    estado = Estado(esp)
+    estado = Estado(esp, Espacio(carpeta_real) if carpeta_real else None)
     estado.obtener()
     estado.vigilar()
     srv = None
