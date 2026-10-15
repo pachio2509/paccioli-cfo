@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "paccioli-cfo"
-version = "1.1.0"
+version = "1.2.0"
 description = "Tu CFO en tu computadora: lee tu estado de cuenta y te da tu estado financiero en vivo."
 readme = "README.md"
 license = { text = "MIT" }
@@ -20,4 +20,4 @@ paccioli = "paccioli_cfo.__main__:main"
 packages = ["paccioli_cfo", "paccioli_cfo.lectores"]
 
 [tool.setuptools.package-data]
-paccioli_cfo = ["web/*"]
+paccioli_cfo = ["web/*", "web/lucca/*"]

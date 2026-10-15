@@ -45,18 +45,45 @@ function toast(t, ms = 2600) {
 }
 
 // ---------------------------------------------------------------- subir archivos
+const espera = (ms) => new Promise((r) => setTimeout(r, ms));
+// pantalla de carga con Lucca: avanza los pasos mientras el servidor lee los archivos
+async function pasosCarga(trabajo) {
+  const lis = [...document.querySelectorAll("#pasos li")];
+  lis.forEach((l) => (l.className = ""));
+  $("#cargando").hidden = false;
+  let listo = false, error = null;
+  trabajo.then(() => (listo = true), (e) => { error = e; listo = true; });
+  for (let i = 0; i < lis.length; i++) {
+    lis[i].className = "activo";
+    await espera(850);
+    while (i === lis.length - 1 && !listo) await espera(150);
+    if (error) break;
+    lis[i].className = "hecho";
+  }
+  await espera(error ? 0 : 450);
+  $("#cargando").hidden = true;
+  if (error) throw error;
+}
 async function subir(files) {
-  for (const f of files) {
-    toast("Leyendo " + f.name + "…", 6000);
-    try {
+  if (!files.length) return;
+  const trabajo = (async () => {
+    for (const f of files) {
       const r = await fetch("/api/subir?nombre=" + encodeURIComponent(f.name), { method: "POST", body: f });
       const j = await r.json();
-      if (!j.ok) throw new Error(j.error);
-    } catch (e) { toast("No pude subir " + f.name + ": " + e.message, 5000); return; }
-  }
-  await cargar();
+      if (!j.ok) throw new Error(f.name + ": " + j.error);
+    }
+    await cargar();
+  })();
+  try { await pasosCarga(trabajo); } catch (e) { toast("No pude leer " + e.message, 6000); return; }
+  vista = "resumen"; mostrarVista(); window.scrollTo({ top: 0, behavior: "smooth" });
   toast("Listo. Ya leí tu estado de cuenta.");
 }
+let vista = "resumen";
+function mostrarVista() {
+  document.querySelectorAll(".vista").forEach((b) => b.setAttribute("aria-selected", b.dataset.v === vista));
+  $("#v-resumen").hidden = vista !== "resumen"; $("#v-detalle").hidden = vista !== "detalle";
+}
+document.querySelectorAll(".vista").forEach((b) => b.addEventListener("click", () => { vista = b.dataset.v; mostrarVista(); }));
 $("#archivo").addEventListener("change", (e) => { subir([...e.target.files]); e.target.value = ""; });
 let arrastre = 0;
 window.addEventListener("dragenter", (e) => { e.preventDefault(); arrastre++; $("#overlay").hidden = false; });
@@ -70,7 +97,8 @@ $("#buscar").addEventListener("input", (e) => { buscar = e.target.value.toLowerC
 function render() {
   if (E.error) { $("#vacio").hidden = false; $("#contenido").hidden = true; $(".empty-card h1").textContent = "Algo falló al leer tus archivos"; $(".empty-card .sub").textContent = E.error; return; }
   $("#ver").textContent = "v" + (E.app || "");
-  $("#carpeta").textContent = E.carpeta || "mis-estados-de-cuenta";
+  $("#carpeta").textContent = E.carpeta ? "…/" + E.carpeta.split(/[\\/]/).filter(Boolean).slice(-2).join("/") : "mis-estados-de-cuenta";
+  $("#carpeta").title = E.carpeta || "";
   const hay = E.meses && E.meses.length;
   $("#vacio").hidden = !!hay; $("#contenido").hidden = !hay;
   if (!hay) { if (E.errores && E.errores.length) toast(E.errores[0].error, 7000); return; }
@@ -78,7 +106,6 @@ function render() {
   const nombreMes = E.meses.find((m) => m.mes === mesSel).nombre;
   $("#periodo").textContent = "Cierre de " + nombreMes + (d.parcial ? ` · mes incompleto (${d.dias} días)` : "");
   $("#titulo").textContent = "¿Cómo le fue a " + E.negocio + "?";
-  $("#subtitulo").textContent = `Leí ${E.movimientos.length} movimientos de ${E.archivos.length} archivo${E.archivos.length > 1 ? "s" : ""}. Ingresos y gastos sin IVA; lo que sale del banco, con IVA.`;
   $("#meses").innerHTML = E.meses.map((m) => `<button class="month" role="tab" aria-selected="${m.mes === mesSel}" data-m="${m.mes}">${esc(m.nombre)}${E.por_mes[m.mes].parcial ? "<small>parcial</small>" : ""}</button>`).join("");
   document.querySelectorAll(".month").forEach((b) => b.addEventListener("click", () => { mesSel = b.dataset.m; render(); }));
   const prev = mesAnterior();
@@ -111,10 +138,10 @@ function renderVeredicto(d, prev) {
   $("#big").classList.toggle("neg", ut < 0);
   const c100 = d.ingresos ? (ut / d.ingresos) * 100 : null;
   $("#big-s").innerHTML = `${c100 != null ? `De cada <b>$100</b> que vendes ${c100 >= 0 ? `te quedan <b>$${c100.toFixed(2)}</b>` : `<b>pierdes $${(-c100).toFixed(2)}</b>`}` : ""} ${delta(ut, prev && prev.utilidad)}`;
-  $("#veredicto").className = "verdict " + nivel;
-  $("#veredicto").innerHTML = `<div class="dot"></div><div>
-    <p><b>${txt}.</b> ${ut >= 0 ? "Tu operación dejó" : "Tu operación perdió"} <b>${peso(Math.abs(ut))}</b> sobre ingresos de ${peso(d.ingresos)}${d.margen != null ? ` (${pct(d.margen)} de margen)` : ""}.</p>
-    ${a ? `<p><b>Lo más importante:</b> ${esc(a.titulo)}. ${esc(a.accion || a.detalle)}</p>` : ""}</div>`;
+  $("#veredicto").className = "bubble " + nivel;
+  $("#veredicto").innerHTML = `<span class="tag">${txt}</span>
+    ${a ? `<p><b>${esc(a.titulo)}.</b> ${esc(a.accion || a.detalle)}</p>` : `<p>${ut >= 0 ? "Tu operación dejó" : "Tu operación perdió"} <b>${peso(Math.abs(ut))}</b> sobre ventas de ${peso(d.ingresos)}.</p>`}`;
+  $("#lucca-hero").src = "/lucca/lucca-" + (nivel === "verde" || nivel === "info" ? "pulgar" : nivel === "rojo" ? "libreta" : "cafe") + ".png";
 }
 
 // ---------------------------------------------------------------- salud financiera (0-100)
@@ -158,21 +185,22 @@ function renderKpis(d, prev) {
   const hasta = E.tendencia.slice(0, E.tendencia.findIndex((t) => t.mes === mesSel) + 1);
   const serie = (k) => hasta.map((t) => t[k]);
   const k = [
-    ["Ingresos", peso(d.ingresos), "Lo que vendiste, sin IVA", "brand", delta(d.ingresos, prev && prev.ingresos), spark(serie("ingresos"), "var(--s1)")],
-    ["Gastos de operación", peso(d.gastos), d.ingresos ? pct(d.gastos / d.ingresos) + " de tus ingresos" : "", "", delta(d.gastos, prev && prev.gastos, false), spark(serie("gastos"), "var(--s2)")],
-    ["Utilidad", peso(d.utilidad), d.margen != null ? pct(d.margen) + " de margen" : "", d.utilidad < 0 ? "crit" : d.margen < 0.1 ? "warn" : "good", delta(d.utilidad, prev && prev.utilidad), spark(serie("utilidad"), "var(--ink)")],
-    ["Punto de equilibrio", d.equilibrio ? peso(d.equilibrio) : "—", d.equilibrio ? (d.ingresos >= d.equilibrio ? `Vendes ${pct((d.ingresos - d.equilibrio) / d.equilibrio)} arriba` : `Te faltan ${peso(d.equilibrio - d.ingresos)}`) : "Lo mínimo que debes vender al mes", d.equilibrio && d.ingresos < d.equilibrio ? "crit" : "", "", ""],
-    ["Dinero en el banco", E.saldo != null ? peso(E.saldo) : "—", dias != null ? `Cubre ${Math.max(0, Math.round(dias))} día${Math.round(dias) === 1 ? "" : "s"} de pagos` : "Sube un PDF para ver tu saldo", dias != null && dias < 15 ? "crit" : dias != null && dias < 30 ? "warn" : "good", "", ""],
+    ["Vendiste", peso(d.ingresos), "Sin IVA", "marca", delta(d.ingresos, prev && prev.ingresos), spark(serie("ingresos"), "var(--s1)")],
+    ["Gastaste", peso(d.gastos), d.ingresos ? pct(d.gastos / d.ingresos) + " de lo que vendiste" : "", "", delta(d.gastos, prev && prev.gastos, false), spark(serie("gastos"), "var(--s2)")],
+    ["Tienes en el banco", E.saldo != null ? peso(E.saldo) : "—", dias != null ? `Cubre ${Math.max(0, Math.round(dias))} día${Math.round(dias) === 1 ? "" : "s"} de pagos` : "Sube un PDF para ver tu saldo", dias != null && dias < 15 ? "crit" : dias != null && dias < 30 ? "warn" : "good", "", ""],
     ["Aparta para el SAT", imp.definido ? peso(imp.total) : "—", imp.definido ? `ISR ${peso(imp.isr)} + IVA ${peso(imp.iva)}` : "Contesta tu régimen fiscal", imp.definido ? "warn" : "", "", ""],
   ];
   $("#kpis").innerHTML = k.map(([l, v, s, c, dl, sp]) => `<div class="kpi ${c}"><span class="l">${l}</span><span class="v">${v}</span><span class="s">${esc(s)}</span>${dl || sp ? `<div class="row">${dl || "<span></span>"}${sp}</div>` : ""}</div>`).join("");
 }
 
+let todasAlertas = false;
 function renderAlertas() {
-  const xs = porNivel(E.alertas);
-  $("#alertas").innerHTML = xs.length ? xs.map((a, i) => `<div class="alert ${a.nivel}"><span class="ic">${a.nivel === "verde" ? "✓" : i + 1}</span><div>
+  const xs = porNivel(E.alertas), ver = todasAlertas ? xs : xs.slice(0, 3);
+  $("#alertas").innerHTML = xs.length ? ver.map((a, i) => `<div class="alert ${a.nivel}"><span class="ic">${a.nivel === "verde" ? "✓" : i + 1}</span><div>
     <b>${esc(a.titulo)}</b><div class="d">${esc(a.detalle)}</div>${a.accion ? `<div class="a">→ ${esc(a.accion)}</div>` : ""}</div></div>`).join("")
+    + (xs.length > 3 ? `<button class="mas" id="mas-alertas" type="button">${todasAlertas ? "Ver solo las 3 importantes" : `Ver las ${xs.length} cosas que noté`}</button>` : "")
     : `<div class="done">✓ Nada urgente este mes. Sigue así.</div>`;
+  const m = $("#mas-alertas"); if (m) m.addEventListener("click", () => { todasAlertas = !todasAlertas; renderAlertas(); });
 }
 
 // ---------------------------------------------------------------- simulador "¿y si...?"
@@ -214,7 +242,6 @@ function pintarSim() {
     <div class="dif">${Math.abs(dif) < 1 ? "Mueve las palancas para ver el efecto." : `${dif > 0 ? "<b>+" : "<b>−"}${peso(Math.abs(dif)).replace("−", "")}</b> al mes · <b>${dif > 0 ? "+" : "−"}${peso(Math.abs(dif * 12)).replace("−", "")}</b> al año`}</div>
     <div class="mini"><div><b>${r.m != null ? pct(r.m) : "—"}</b><span>Margen</span></div><div><b>${peso(r.I)}</b><span>Ingresos</span></div><div><b>${r.pe ? peso(r.pe) : "—"}</b><span>Punto de equilibrio</span></div></div>
     <div class="meta">${meta}</div>`;
-  $("#sim-meta").textContent = "Simulación sobre un mes. Supone que tu costo directo crece con el volumen y que tus gastos fijos no cambian si no los recortas.";
 }
 
 // ---------------------------------------------------------------- Kaptal
@@ -229,24 +256,28 @@ function renderKaptal(d) {
     : `Tu margen ya está sano. Un CFO de Kaptal te ayuda a planear tus impuestos, proyectar tu crecimiento y decidir dónde invertir.`;
 }
 
+// una pregunta a la vez para no abrumar; "despues" la manda al final de la fila
+let saltadas = [], contestadas = 0;
 function renderPreguntas() {
-  const qs = E.preguntas;
-  const n = qs.filter((q) => q.tipo !== "info").length;
-  $("#nq").textContent = n || "";
+  const todas = E.preguntas.filter((q) => q.tipo !== "info");
+  const qs = [...todas.filter((q) => !saltadas.includes(q.id)), ...todas.filter((q) => saltadas.includes(q.id))];
+  const total = qs.length + contestadas;
+  $("#q-prog").innerHTML = qs.length ? `Pregunta ${contestadas + 1} de ${total} · tu respuesta se aplica sola a los movimientos parecidos<div class="prog"><i style="width:${(contestadas / total) * 100}%"></i></div>` : "";
   if (!qs.length) { $("#preguntas").innerHTML = `<div class="done">✓ Ya entendí todo tu mes. Si algo cambia, te aviso.</div>`; return; }
-  $("#preguntas").innerHTML = qs.map((q) => {
-    let cuerpo = "";
-    if (q.entrada) cuerpo = `<form class="entrada" data-id="${esc(q.id)}"><input name="v" type="${q.entrada === "numero" ? "number" : "text"}" ${q.entrada === "numero" ? 'min="0" step="100"' : ""} required aria-label="${esc(q.titulo)}"><button class="btn primary">Guardar</button></form>`;
-    else if (q.opciones.length) cuerpo = `<div class="opts">${q.opciones.map((o) => `<button class="opt" data-id="${esc(q.id)}" data-v="${esc(o.valor)}">${esc(o.label)}</button>`).join("")}</div>`;
-    return `<div class="q ${q.tipo === "info" ? "info" : ""}"><b>${esc(q.titulo)}</b><div class="d">${esc(q.detalle || "")}</div>${cuerpo}</div>`;
-  }).join("");
-  document.querySelectorAll(".opt").forEach((b) => b.addEventListener("click", () => responder(b.dataset.id, b.dataset.v, b)));
-  document.querySelectorAll("form.entrada").forEach((f) => f.addEventListener("submit", (e) => { e.preventDefault(); responder(f.dataset.id, f.v.value, f); }));
+  const q = qs[0];
+  let cuerpo = "";
+  if (q.entrada) cuerpo = `<form class="entrada" data-id="${esc(q.id)}"><input name="v" type="${q.entrada === "numero" ? "number" : "text"}" ${q.entrada === "numero" ? 'min="0" step="100"' : ""} required aria-label="${esc(q.titulo)}"><button class="btn primary">Guardar</button></form>`;
+  else if (q.opciones.length) cuerpo = `<div class="opts">${q.opciones.map((o) => `<button class="opt" data-id="${esc(q.id)}" data-v="${esc(o.valor)}">${esc(o.label)}</button>`).join("")}</div>`;
+  $("#preguntas").innerHTML = `<div class="q1"><b>${esc(q.titulo)}</b>${q.detalle ? `<div class="d">${esc(q.detalle)}</div>` : ""}${cuerpo}
+    ${qs.length > 1 ? `<button class="mas saltar" type="button">Después te contesto →</button>` : ""}</div>`;
+  document.querySelectorAll(".q1 .opt").forEach((b) => b.addEventListener("click", () => responder(b.dataset.id, b.dataset.v, b)));
+  document.querySelectorAll(".q1 form.entrada").forEach((f) => f.addEventListener("submit", (e) => { e.preventDefault(); responder(f.dataset.id, f.v.value, f); }));
+  const s = $(".q1 .saltar"); if (s) s.addEventListener("click", () => { saltadas = [...saltadas.filter((x) => x !== q.id), q.id]; renderPreguntas(); });
 }
 async function responder(id, valor, el) {
-  el.closest(".q").style.opacity = .45;
-  try { await post("/api/responder", { id, valor }); toast("Anotado. Recalculando tu tablero…"); await cargar(); }
-  catch (e) { el.closest(".q").style.opacity = 1; toast(e.message, 5000); }
+  const caja = el.closest(".q1"); caja.style.opacity = .45;
+  try { await post("/api/responder", { id, valor }); contestadas++; saltadas = saltadas.filter((x) => x !== id); toast("Anotado. Recalculando tu tablero…"); await cargar(); }
+  catch (e) { caja.style.opacity = 1; toast(e.message, 5000); }
 }
 
 // ---------------------------------------------------------------- graficas (SVG sin librerias)
