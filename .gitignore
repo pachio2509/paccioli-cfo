@@ -1,0 +1,15 @@
+# Tus datos NUNCA se suben a GitHub
+mi-negocio/
+mis-estados-de-cuenta/*
+!mis-estados-de-cuenta/LEEME.md
+demo/.espacio/
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.DS_Store

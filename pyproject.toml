@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "paccioli-cfo"
+version = "1.0.0"
+description = "Tu CFO en tu computadora: lee tu estado de cuenta y te da tu estado financiero en vivo."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.9"
+authors = [{ name = "Kaptal · Paccioli" }]
+dependencies = ["pdfplumber>=0.10", "openpyxl>=3.1"]
+keywords = ["finanzas", "cfo", "pymes", "mexico", "estado de cuenta", "contabilidad", "bbva"]
+
+[project.scripts]
+paccioli = "paccioli_cfo.__main__:main"
+
+[tool.setuptools]
+packages = ["paccioli_cfo", "paccioli_cfo.lectores"]
+
+[tool.setuptools.package-data]
+paccioli_cfo = ["web/*"]

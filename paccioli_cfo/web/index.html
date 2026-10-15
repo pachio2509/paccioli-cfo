@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paccioli CFO</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%230F1B2D'/%3E%3Ctext x='16' y='22' font-family='Arial' font-weight='700' font-size='17' fill='white' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="/estilos.css">
+</head>
+<body>
+<div class="drop-overlay" id="overlay" hidden><div>Suelta tu estado de cuenta aquí</div></div>
+
+<header class="top">
+  <div class="brand"><span class="logo">P</span><div><div class="brand-name">PACCIOLI CFO</div><div class="brand-sub">Tu estado financiero, en vivo</div></div></div>
+  <div class="top-actions">
+    <span class="live" id="live"><i></i>En vivo</span>
+    <label class="btn primary" for="archivo">Subir estado de cuenta</label>
+    <input type="file" id="archivo" accept=".pdf,.csv,.xlsx,.xlsm" multiple hidden>
+    <button class="btn" id="imprimir" type="button">Imprimir / PDF</button>
+  </div>
+</header>
+
+<main class="wrap" id="app">
+  <section class="empty" id="vacio" hidden>
+    <div class="empty-card">
+      <div class="eyebrow">Paso 1 de 1</div>
+      <h1>Suelta tu estado de cuenta y te digo cómo va tu negocio</h1>
+      <p class="sub">PDF de BBVA, o el Excel/CSV que descargas de tu banca en línea (cualquier banco). Leo tus movimientos, te pregunto lo que no entiendo y te enseño tus números de CFO.</p>
+      <label class="dropzone" for="archivo"><strong>Arrastra aquí tu archivo</strong><span>o haz clic para buscarlo</span></label>
+      <p class="privacy">🔒 Tus archivos no salen de tu computadora. Se quedan en la carpeta <code id="carpeta"></code></p>
+    </div>
+  </section>
+
+  <section id="contenido" hidden>
+    <div class="head">
+      <div>
+        <div class="eyebrow" id="periodo"></div>
+        <h1 id="titulo"></h1>
+        <p class="sub" id="subtitulo"></p>
+      </div>
+      <div class="months" id="meses" role="tablist" aria-label="Mes"></div>
+    </div>
+
+    <div class="verdict" id="veredicto"></div>
+    <div class="kpis" id="kpis"></div>
+
+    <div class="grid two">
+      <section class="card" aria-labelledby="t-avisa">
+        <h2 id="t-avisa">Tu CFO te avisa</h2>
+        <div id="alertas" class="alerts"></div>
+      </section>
+      <section class="card" aria-labelledby="t-pregunta">
+        <h2 id="t-pregunta">Tu CFO te pregunta <span class="count" id="nq"></span></h2>
+        <p class="take">Cada respuesta se aplica sola a los movimientos parecidos, hoy y los próximos meses.</p>
+        <div id="preguntas" class="questions"></div>
+      </section>
+    </div>
+
+    <div class="grid">
+      <section class="card wide">
+        <h2>De lo que entra a lo que te queda</h2>
+        <p class="take" id="t-cascada"></p>
+        <div id="cascada" class="chart"></div>
+        <div class="legend"><span><i class="sw s1"></i>Resultado</span><span><i class="sw s2"></i>Costo o gasto</span><span><i class="sw crit"></i>Pérdida</span></div>
+      </section>
+      <section class="card wide" id="card-tendencia" hidden>
+        <h2>Mes con mes</h2>
+        <p class="take">Ingresos y gastos de la operación por mes. La línea es tu utilidad.</p>
+        <div id="tendencia" class="chart"></div>
+        <div class="legend"><span><i class="sw s1"></i>Ingresos</span><span><i class="sw s2"></i>Gastos</span><span><i class="sw line"></i>Utilidad</span></div>
+      </section>
+      <section class="card">
+        <h2>¿Quién te paga?</h2>
+        <p class="take">Tus clientes y fuentes de ingreso del mes (con IVA).</p>
+        <div id="clientes" class="chart"></div>
+      </section>
+      <section class="card">
+        <h2>¿En qué se va tu dinero?</h2>
+        <p class="take">Todo lo que salió del banco, por concepto (con IVA).</p>
+        <div id="gastos" class="chart"></div>
+      </section>
+      <section class="card wide">
+        <h2>Estado de resultados</h2>
+        <p class="take" id="t-er"></p>
+        <div class="tbl" id="er"></div>
+      </section>
+      <section class="card wide">
+        <div class="row-head"><h2>Movimientos</h2><input id="buscar" type="search" placeholder="Buscar…" aria-label="Buscar movimientos"></div>
+        <p class="take">¿Algo está mal clasificado? Cámbialo aquí y el tablero se recalcula.</p>
+        <div class="tbl" id="movs"></div>
+      </section>
+      <section class="card wide">
+        <h2>Tus archivos</h2>
+        <div id="archivos"></div>
+        <p class="note" id="supuestos"></p>
+      </section>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div>🔒 Tus datos nunca salen de tu computadora. Paccioli CFO lee tus archivos de forma local.</div>
+  <div>Estimaciones informativas: no sustituyen a tu contador. Hecho en Mérida por <a href="https://kaptal.com.mx" target="_blank" rel="noopener">Kaptal</a> · <strong>Paccioli</strong> <span id="ver"></span></div>
+</footer>
+<div class="toast" id="toast" hidden></div>
+<div class="tip" id="tip" hidden></div>
+<script src="/app.js"></script>
+</body>
+</html>
