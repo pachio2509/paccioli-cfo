@@ -4,25 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Paccioli CFO</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%230F1B2D'/%3E%3Ctext x='16' y='22' font-family='Arial' font-weight='700' font-size='17' fill='white' text-anchor='middle'%3EP%3C/text%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23012243'/%3E%3Crect x='7' y='7' width='5' height='5' fill='%2303cdd0'/%3E%3Ctext x='18' y='24' font-family='Arial' font-weight='800' font-size='18' fill='white' text-anchor='middle'%3Ep%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap">
 <link rel="stylesheet" href="/estilos.css">
 </head>
 <body>
 <div class="drop-overlay" id="overlay" hidden><div>Suelta tu estado de cuenta aquí</div></div>
 
 <header class="top">
-  <div class="brand"><span class="logo">P</span><div><div class="brand-name">PACCIOLI CFO</div><div class="brand-sub">Tu estado financiero, en vivo</div></div></div>
+  <div class="brand"><img src="/logo-blanco.png" alt="Paccioli" class="logo-img"><span class="brand-tag">CFO</span></div>
   <div class="top-actions">
     <span class="live" id="live"><i></i>En vivo</span>
     <label class="btn primary" for="archivo">Subir estado de cuenta</label>
     <input type="file" id="archivo" accept=".pdf,.csv,.xlsx,.xlsm" multiple hidden>
-    <button class="btn" id="imprimir" type="button">Imprimir / PDF</button>
+    <button class="btn ghost" id="imprimir" type="button">Imprimir / PDF</button>
   </div>
 </header>
 
-<main class="wrap" id="app">
+<main id="app">
   <section class="empty" id="vacio" hidden>
     <div class="empty-card">
       <div class="eyebrow">Paso 1 de 1</div>
@@ -34,68 +34,119 @@
   </section>
 
   <section id="contenido" hidden>
-    <div class="head">
-      <div>
-        <div class="eyebrow" id="periodo"></div>
+    <div class="hero">
+      <div class="wrap">
+        <div class="hero-top">
+          <div class="eyebrow" id="periodo"></div>
+          <div class="months" id="meses" role="tablist" aria-label="Mes"></div>
+        </div>
         <h1 id="titulo"></h1>
         <p class="sub" id="subtitulo"></p>
+        <div class="hero-grid">
+          <div class="hero-main">
+            <div class="big-l">Utilidad de operación</div>
+            <div class="big" id="big"></div>
+            <div class="big-s" id="big-s"></div>
+            <div class="verdict" id="veredicto"></div>
+          </div>
+          <div class="salud" id="salud" aria-label="Salud financiera"></div>
+        </div>
       </div>
-      <div class="months" id="meses" role="tablist" aria-label="Mes"></div>
     </div>
 
-    <div class="verdict" id="veredicto"></div>
-    <div class="kpis" id="kpis"></div>
+    <div class="wrap body">
+      <div class="kpis" id="kpis"></div>
 
-    <div class="grid two">
-      <section class="card" aria-labelledby="t-avisa">
-        <h2 id="t-avisa">Tu CFO te avisa</h2>
-        <div id="alertas" class="alerts"></div>
-      </section>
-      <section class="card" aria-labelledby="t-pregunta">
-        <h2 id="t-pregunta">Tu CFO te pregunta <span class="count" id="nq"></span></h2>
-        <p class="take">Cada respuesta se aplica sola a los movimientos parecidos, hoy y los próximos meses.</p>
-        <div id="preguntas" class="questions"></div>
-      </section>
-    </div>
+      <div class="grid two">
+        <section class="card" aria-labelledby="t-avisa">
+          <h2 id="t-avisa">Tu plan de acción</h2>
+          <p class="take">Lo que tu CFO arreglaría primero, en orden de importancia.</p>
+          <div id="alertas" class="alerts"></div>
+        </section>
+        <section class="card" aria-labelledby="t-pregunta">
+          <h2 id="t-pregunta">Tu CFO te pregunta <span class="count" id="nq"></span></h2>
+          <p class="take">Cada respuesta se aplica sola a los movimientos parecidos, hoy y los próximos meses.</p>
+          <div id="preguntas" class="questions"></div>
+        </section>
+      </div>
 
-    <div class="grid">
-      <section class="card wide">
-        <h2>De lo que entra a lo que te queda</h2>
-        <p class="take" id="t-cascada"></p>
-        <div id="cascada" class="chart"></div>
-        <div class="legend"><span><i class="sw s1"></i>Resultado</span><span><i class="sw s2"></i>Costo o gasto</span><span><i class="sw crit"></i>Pérdida</span></div>
+      <section class="card wide sim" aria-labelledby="t-sim">
+        <div class="sim-head">
+          <div>
+            <div class="eyebrow accent">Simulador</div>
+            <h2 id="t-sim">¿Y si…? Mueve las palancas de tu negocio</h2>
+            <p class="take">Prueba decisiones antes de tomarlas. Parte de tus números reales del mes.</p>
+          </div>
+          <button class="btn outline" id="sim-reset" type="button">Reiniciar</button>
+        </div>
+        <div class="sim-grid">
+          <div class="sliders" id="sliders"></div>
+          <div class="sim-out" id="sim-out"></div>
+        </div>
+        <p class="note" id="sim-meta"></p>
       </section>
-      <section class="card wide" id="card-tendencia" hidden>
-        <h2>Mes con mes</h2>
-        <p class="take">Ingresos y gastos de la operación por mes. La línea es tu utilidad.</p>
-        <div id="tendencia" class="chart"></div>
-        <div class="legend"><span><i class="sw s1"></i>Ingresos</span><span><i class="sw s2"></i>Gastos</span><span><i class="sw line"></i>Utilidad</span></div>
+
+      <div class="grid">
+        <section class="card wide">
+          <h2>De lo que entra a lo que te queda</h2>
+          <p class="take" id="t-cascada"></p>
+          <div id="cascada" class="chart"></div>
+          <div class="legend"><span><i class="sw s1"></i>Resultado</span><span><i class="sw s2"></i>Costo o gasto</span><span><i class="sw crit"></i>Pérdida</span></div>
+        </section>
+        <section class="card wide" id="card-tendencia" hidden>
+          <h2>Mes con mes</h2>
+          <p class="take">Ingresos y gastos de la operación por mes. La línea es tu utilidad.</p>
+          <div id="tendencia" class="chart"></div>
+          <div class="legend"><span><i class="sw s1"></i>Ingresos</span><span><i class="sw s2"></i>Gastos</span><span><i class="sw line"></i>Utilidad</span></div>
+        </section>
+        <section class="card">
+          <h2>¿Quién te paga?</h2>
+          <p class="take">Tus clientes y fuentes de ingreso del mes (con IVA).</p>
+          <div id="clientes" class="chart"></div>
+        </section>
+        <section class="card">
+          <h2>¿En qué se va tu dinero?</h2>
+          <p class="take">Todo lo que salió del banco, por concepto (con IVA).</p>
+          <div id="gastos" class="chart"></div>
+        </section>
+      </div>
+
+      <section class="kaptal" aria-labelledby="t-kaptal">
+        <div>
+          <div class="eyebrow">Paccioli te dice qué pasa · Kaptal te ayuda a arreglarlo</div>
+          <h2 id="t-kaptal"></h2>
+          <p id="kaptal-txt"></p>
+          <ul>
+            <li>Revisamos tus números contigo y armamos el plan para subir tu margen.</li>
+            <li>Planeación fiscal: pagas lo justo al SAT, a tiempo y sin sorpresas.</li>
+            <li>Tu contabilidad, declaraciones y nómina al día, con contadores de verdad.</li>
+          </ul>
+        </div>
+        <div class="contacto">
+          <div class="quien"><b>Jorge Ayala</b><span>CFO · Kaptal</span></div>
+          <p>¿Quieres más información o algo más especializado para tu empresa? Escríbeme directo.</p>
+          <a class="btn cta" href="https://wa.me/529991750122?text=Hola%20Jorge%2C%20us%C3%A9%20Paccioli%20CFO%20y%20quiero%20m%C3%A1s%20informaci%C3%B3n." target="_blank" rel="noopener">WhatsApp · 999 175 0122</a>
+          <a class="btn cta2" href="mailto:jorge@kaptal.com.mx?subject=Paccioli%20CFO%3A%20quiero%20m%C3%A1s%20informaci%C3%B3n">jorge@kaptal.com.mx</a>
+        </div>
       </section>
-      <section class="card">
-        <h2>¿Quién te paga?</h2>
-        <p class="take">Tus clientes y fuentes de ingreso del mes (con IVA).</p>
-        <div id="clientes" class="chart"></div>
-      </section>
-      <section class="card">
-        <h2>¿En qué se va tu dinero?</h2>
-        <p class="take">Todo lo que salió del banco, por concepto (con IVA).</p>
-        <div id="gastos" class="chart"></div>
-      </section>
-      <section class="card wide">
-        <h2>Estado de resultados</h2>
-        <p class="take" id="t-er"></p>
-        <div class="tbl" id="er"></div>
-      </section>
-      <section class="card wide">
-        <div class="row-head"><h2>Movimientos</h2><input id="buscar" type="search" placeholder="Buscar…" aria-label="Buscar movimientos"></div>
-        <p class="take">¿Algo está mal clasificado? Cámbialo aquí y el tablero se recalcula.</p>
-        <div class="tbl" id="movs"></div>
-      </section>
-      <section class="card wide">
-        <h2>Tus archivos</h2>
-        <div id="archivos"></div>
-        <p class="note" id="supuestos"></p>
-      </section>
+
+      <div class="grid">
+        <section class="card wide">
+          <h2>Estado de resultados</h2>
+          <p class="take" id="t-er"></p>
+          <div class="tbl" id="er"></div>
+        </section>
+        <section class="card wide">
+          <div class="row-head"><h2>Movimientos</h2><input id="buscar" type="search" placeholder="Buscar…" aria-label="Buscar movimientos"></div>
+          <p class="take">¿Algo está mal clasificado? Cámbialo aquí y el tablero se recalcula.</p>
+          <div class="tbl" id="movs"></div>
+        </section>
+        <section class="card wide">
+          <h2>Tus archivos</h2>
+          <div id="archivos"></div>
+          <p class="note" id="supuestos"></p>
+        </section>
+      </div>
     </div>
   </section>
 </main>
@@ -103,6 +154,7 @@
 <footer class="foot">
   <div>🔒 Tus datos nunca salen de tu computadora. Paccioli CFO lee tus archivos de forma local.</div>
   <div>Estimaciones informativas: no sustituyen a tu contador. Hecho en Mérida por <a href="https://kaptal.com.mx" target="_blank" rel="noopener">Kaptal</a> · <strong>Paccioli</strong> <span id="ver"></span></div>
+  <div>¿Dudas o algo más especializado? Jorge Ayala, Kaptal: <a href="https://wa.me/529991750122" target="_blank" rel="noopener">WhatsApp 999 175 0122</a> · <a href="mailto:jorge@kaptal.com.mx">jorge@kaptal.com.mx</a></div>
 </footer>
 <div class="toast" id="toast" hidden></div>
 <div class="tip" id="tip" hidden></div>

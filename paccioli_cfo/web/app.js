@@ -81,41 +81,152 @@ function render() {
   $("#subtitulo").textContent = `Leí ${E.movimientos.length} movimientos de ${E.archivos.length} archivo${E.archivos.length > 1 ? "s" : ""}. Ingresos y gastos sin IVA; lo que sale del banco, con IVA.`;
   $("#meses").innerHTML = E.meses.map((m) => `<button class="month" role="tab" aria-selected="${m.mes === mesSel}" data-m="${m.mes}">${esc(m.nombre)}${E.por_mes[m.mes].parcial ? "<small>parcial</small>" : ""}</button>`).join("");
   document.querySelectorAll(".month").forEach((b) => b.addEventListener("click", () => { mesSel = b.dataset.m; render(); }));
-  renderVeredicto(d); renderKpis(d); renderAlertas(); renderPreguntas();
+  const prev = mesAnterior();
+  renderVeredicto(d, prev); renderSalud(d, prev); renderKpis(d, prev); renderAlertas(); renderPreguntas(); renderSim(d);
   renderCascada(d); renderTendencia(); renderBarras("#clientes", d.clientes.slice(0, 10), "var(--s1)");
-  renderBarras("#gastos", d.gastos_categoria.slice(0, 12), "var(--s2)"); renderER(d); renderMovs(); renderArchivos();
+  renderBarras("#gastos", d.gastos_categoria.slice(0, 12), "var(--s2)"); renderKaptal(d); renderER(d); renderMovs(); renderArchivos();
 }
 
-function renderVeredicto(d) {
-  const orden = ["rojo", "ambar", "verde", "info"];
-  const a = [...E.alertas].sort((x, y) => orden.indexOf(x.nivel) - orden.indexOf(y.nivel))[0];
+const ORDEN = ["rojo", "ambar", "verde", "info"];
+const porNivel = (xs) => [...xs].sort((x, y) => ORDEN.indexOf(x.nivel) - ORDEN.indexOf(y.nivel));
+function mesAnterior() {
+  const i = E.meses.findIndex((m) => m.mes === mesSel);
+  return i > 0 ? E.por_mes[E.meses[i - 1].mes] : null;
+}
+// cambio contra el mes anterior; "bueno" dice si subir es buena noticia
+function delta(actual, antes, bueno = true) {
+  if (antes == null || actual == null || !antes) return "";
+  const c = (actual - antes) / Math.abs(antes);
+  if (Math.abs(c) < 0.005) return `<span class="delta flat">= vs mes ant.</span>`;
+  const sube = c > 0, cls = sube === bueno ? "up" : "down";
+  return `<span class="delta ${cls}" title="Contra el mes anterior">${sube ? "▲" : "▼"} ${Math.abs(c * 100).toFixed(Math.abs(c) < 0.1 ? 1 : 0)}%</span>`;
+}
+
+function renderVeredicto(d, prev) {
+  const a = porNivel(E.alertas)[0];
   const nivel = a ? a.nivel : "info";
   const txt = { rojo: "Semáforo rojo", ambar: "Semáforo ámbar", verde: "Semáforo verde", info: "Tu resumen" }[nivel];
   const ut = d.utilidad;
+  $("#big").textContent = peso(ut);
+  $("#big").classList.toggle("neg", ut < 0);
+  const c100 = d.ingresos ? (ut / d.ingresos) * 100 : null;
+  $("#big-s").innerHTML = `${c100 != null ? `De cada <b>$100</b> que vendes ${c100 >= 0 ? `te quedan <b>$${c100.toFixed(2)}</b>` : `<b>pierdes $${(-c100).toFixed(2)}</b>`}` : ""} ${delta(ut, prev && prev.utilidad)}`;
   $("#veredicto").className = "verdict " + nivel;
   $("#veredicto").innerHTML = `<div class="dot"></div><div>
     <p><b>${txt}.</b> ${ut >= 0 ? "Tu operación dejó" : "Tu operación perdió"} <b>${peso(Math.abs(ut))}</b> sobre ingresos de ${peso(d.ingresos)}${d.margen != null ? ` (${pct(d.margen)} de margen)` : ""}.</p>
     ${a ? `<p><b>Lo más importante:</b> ${esc(a.titulo)}. ${esc(a.accion || a.detalle)}</p>` : ""}</div>`;
 }
 
-function renderKpis(d) {
+// ---------------------------------------------------------------- salud financiera (0-100)
+function salud(d, prev) {
+  const lim = (x) => Math.max(0, Math.min(100, x));
+  const dias = E.saldo != null && E.gasto_diario ? E.saldo / E.gasto_diario : null;
+  const sinId = d.lineas.filter((l) => l.seccion === "sin_identificar").reduce((s, l) => s + l.monto, 0);
+  const f = [
+    ["Rentabilidad", d.utilidad <= 0 ? 0 : lim(((d.margen || 0) / 0.15) * 100), d.margen != null ? pct(d.margen) + " de margen" : "—"],
+    dias != null ? ["Colchón de caja", lim((dias / 30) * 100), Math.max(0, Math.round(dias)) + " días"] : null,
+    ["Claridad de tus números", d.gastos ? lim((1 - sinId / d.gastos / 0.5) * 100) : 100, d.gastos ? pct(sinId / d.gastos) + " sin identificar" : "—"],
+    prev && prev.ingresos ? ["Tendencia de ventas", lim((((d.ingresos - prev.ingresos) / prev.ingresos + 0.3) / 0.35) * 100), pct((d.ingresos - prev.ingresos) / prev.ingresos) + " vs mes ant."] : null,
+  ].filter(Boolean);
+  const score = Math.round(f.reduce((s, x) => s + x[1], 0) / f.length);
+  const g = score >= 75 ? ["Sólido", "Tu negocio está sano. Cuida que siga así.", "#4fd39b"] : score >= 55 ? ["Estable", "Funciona, pero hay dinero que se te está yendo.", "#03cdd0"]
+    : score >= 35 ? ["En riesgo", "Hay focos rojos que conviene atender este mes.", "#ffb648"] : ["Crítico", "Atiende tu plan de acción hoy.", "#ff6b7a"];
+  return { score, factores: f, grado: g };
+}
+function renderSalud(d, prev) {
+  const { score, factores, grado } = salud(d, prev);
+  const r = 46, cir = 2 * Math.PI * r;
+  $("#salud").innerHTML = `<div class="salud-top">
+      <div class="ring"><svg viewBox="0 0 112 112" aria-hidden="true"><circle cx="56" cy="56" r="${r}" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="10"/>
+        <circle cx="56" cy="56" r="${r}" fill="none" stroke="${grado[2]}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(cir * score) / 100} ${cir}"/></svg>
+        <div class="n"><div><b>${score}</b><span>de 100</span></div></div></div>
+      <div><h3>Salud financiera</h3><div class="grado" style="color:${grado[2]}">${grado[0]}</div><div class="gs">${grado[1]}</div></div>
+    </div>
+    <div class="factores">${factores.map(([n, v, t]) => `<div class="factor ${v < 35 ? "bajo" : v < 65 ? "medio" : ""}"><span>${n}</span><b>${esc(t)}</b><div class="bar"><i style="width:${Math.max(3, v)}%"></i></div></div>`).join("")}</div>`;
+}
+
+function spark(serie, color) {
+  if (serie.length < 2) return "";
+  const W = 84, H = 26, lo = Math.min(...serie), hi = Math.max(...serie), sp = hi - lo || 1;
+  const pts = serie.map((v, i) => [(i / (serie.length - 1)) * (W - 4) + 2, H - 3 - ((v - lo) / sp) * (H - 6)]);
+  const [lx, ly] = pts[pts.length - 1];
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" aria-hidden="true"><polyline points="${pts.map((p) => p.join(",")).join(" ")}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${lx}" cy="${ly}" r="2.8" fill="${color}"/></svg>`;
+}
+function renderKpis(d, prev) {
   const imp = d.impuestos;
   const dias = E.saldo != null && E.gasto_diario ? E.saldo / E.gasto_diario : null;
+  const hasta = E.tendencia.slice(0, E.tendencia.findIndex((t) => t.mes === mesSel) + 1);
+  const serie = (k) => hasta.map((t) => t[k]);
   const k = [
-    ["Ingresos", peso(d.ingresos), "Lo que vendiste, sin IVA", ""],
-    ["Gastos de operación", peso(d.gastos), d.ingresos ? pct(d.gastos / d.ingresos) + " de tus ingresos" : "", ""],
-    ["Utilidad", peso(d.utilidad), d.margen != null ? pct(d.margen) + " de margen" : "", d.utilidad < 0 ? "crit" : d.margen < 0.1 ? "warn" : "good"],
-    ["Punto de equilibrio", d.equilibrio ? peso(d.equilibrio) : "—", "Lo mínimo que debes vender al mes", d.equilibrio && d.ingresos < d.equilibrio ? "crit" : ""],
-    ["Dinero en el banco", E.saldo != null ? peso(E.saldo) : "—", dias != null ? `Cubre ${Math.max(0, Math.round(dias))} día${Math.round(dias) === 1 ? "" : "s"} de pagos` : "Sube un PDF para ver tu saldo", dias != null && dias < 15 ? "crit" : dias != null && dias < 30 ? "warn" : ""],
-    ["Aparta para el SAT", imp.definido ? peso(imp.total) : "—", imp.definido ? `ISR ${peso(imp.isr)} + IVA ${peso(imp.iva)}` : "Contesta tu régimen fiscal", ""],
+    ["Ingresos", peso(d.ingresos), "Lo que vendiste, sin IVA", "brand", delta(d.ingresos, prev && prev.ingresos), spark(serie("ingresos"), "var(--s1)")],
+    ["Gastos de operación", peso(d.gastos), d.ingresos ? pct(d.gastos / d.ingresos) + " de tus ingresos" : "", "", delta(d.gastos, prev && prev.gastos, false), spark(serie("gastos"), "var(--s2)")],
+    ["Utilidad", peso(d.utilidad), d.margen != null ? pct(d.margen) + " de margen" : "", d.utilidad < 0 ? "crit" : d.margen < 0.1 ? "warn" : "good", delta(d.utilidad, prev && prev.utilidad), spark(serie("utilidad"), "var(--ink)")],
+    ["Punto de equilibrio", d.equilibrio ? peso(d.equilibrio) : "—", d.equilibrio ? (d.ingresos >= d.equilibrio ? `Vendes ${pct((d.ingresos - d.equilibrio) / d.equilibrio)} arriba` : `Te faltan ${peso(d.equilibrio - d.ingresos)}`) : "Lo mínimo que debes vender al mes", d.equilibrio && d.ingresos < d.equilibrio ? "crit" : "", "", ""],
+    ["Dinero en el banco", E.saldo != null ? peso(E.saldo) : "—", dias != null ? `Cubre ${Math.max(0, Math.round(dias))} día${Math.round(dias) === 1 ? "" : "s"} de pagos` : "Sube un PDF para ver tu saldo", dias != null && dias < 15 ? "crit" : dias != null && dias < 30 ? "warn" : "good", "", ""],
+    ["Aparta para el SAT", imp.definido ? peso(imp.total) : "—", imp.definido ? `ISR ${peso(imp.isr)} + IVA ${peso(imp.iva)}` : "Contesta tu régimen fiscal", imp.definido ? "warn" : "", "", ""],
   ];
-  $("#kpis").innerHTML = k.map(([l, v, s, c]) => `<div class="kpi ${c}"><span class="l">${l}</span><span class="v">${v}</span><span class="s">${esc(s)}</span></div>`).join("");
+  $("#kpis").innerHTML = k.map(([l, v, s, c, dl, sp]) => `<div class="kpi ${c}"><span class="l">${l}</span><span class="v">${v}</span><span class="s">${esc(s)}</span>${dl || sp ? `<div class="row">${dl || "<span></span>"}${sp}</div>` : ""}</div>`).join("");
 }
 
 function renderAlertas() {
-  const ic = { rojo: "!", ambar: "!", verde: "✓", info: "i" };
-  $("#alertas").innerHTML = E.alertas.map((a) => `<div class="alert ${a.nivel}"><span class="ic">${ic[a.nivel]}</span><div>
-    <b>${esc(a.titulo)}</b><div class="d">${esc(a.detalle)}</div>${a.accion ? `<div class="a">→ ${esc(a.accion)}</div>` : ""}</div></div>`).join("");
+  const xs = porNivel(E.alertas);
+  $("#alertas").innerHTML = xs.length ? xs.map((a, i) => `<div class="alert ${a.nivel}"><span class="ic">${a.nivel === "verde" ? "✓" : i + 1}</span><div>
+    <b>${esc(a.titulo)}</b><div class="d">${esc(a.detalle)}</div>${a.accion ? `<div class="a">→ ${esc(a.accion)}</div>` : ""}</div></div>`).join("")
+    : `<div class="done">✓ Nada urgente este mes. Sigue así.</div>`;
+}
+
+// ---------------------------------------------------------------- simulador "¿y si...?"
+const SIM0 = { p: 0, v: 0, g: 0 };
+let sim = { ...SIM0 };
+const PALANCAS = [
+  ["p", "Sube tus precios", "Mismos clientes, mismo volumen, precio más alto.", 0, 30, "%"],
+  ["v", "Vende más (o menos)", "Más clientes o más pedidos. Tu costo directo crece igual.", -30, 50, "%"],
+  ["g", "Recorta gastos fijos", "Renta, nómina, servicios, suscripciones.", 0, 40, "%"],
+];
+function simular(d, s) {
+  const I = d.ingresos, C = d.costo || 0, F = Math.max(0, d.gastos - C);
+  const I2 = I * (1 + s.p / 100) * (1 + s.v / 100), C2 = C * (1 + s.v / 100), F2 = F * (1 - s.g / 100), U2 = I2 - C2 - F2;
+  const mc = I2 ? 1 - C2 / I2 : 0;
+  return { I: I2, U: U2, m: I2 ? U2 / I2 : null, pe: mc > 0 ? F2 / mc : null, base: { I, C, F } };
+}
+function renderSim(d) {
+  if (!$("#sliders").children.length) {
+    $("#sliders").innerHTML = PALANCAS.map(([k, n, h, lo, hi]) => `<div class="sl"><label for="sl-${k}">${n}<output id="o-${k}"></output></label><small>${h}</small>
+      <input type="range" id="sl-${k}" min="${lo}" max="${hi}" step="1" value="0"></div>`).join("");
+    PALANCAS.forEach(([k]) => $("#sl-" + k).addEventListener("input", (e) => { sim[k] = +e.target.value; pintarSim(); }));
+    $("#sim-reset").addEventListener("click", () => { sim = { ...SIM0 }; pintarSim(); });
+  }
+  pintarSim();
+}
+function pintarSim() {
+  const d = E.por_mes[mesSel];
+  PALANCAS.forEach(([k, , , lo, hi, u]) => {
+    const r = $("#sl-" + k); r.value = sim[k];
+    r.style.setProperty("--p", ((sim[k] - lo) / (hi - lo)) * 100 + "%");
+    $("#o-" + k).textContent = (sim[k] > 0 && k === "v" ? "+" : k === "g" && sim[k] ? "−" : k === "p" && sim[k] ? "+" : "") + sim[k] + u;
+  });
+  const r = simular(d, sim), dif = r.U - d.utilidad;
+  const { I, C, F } = r.base;
+  const pNec = I ? (C + F) / (0.85 * I) - 1 : null, gNec = F ? 1 - (0.85 * I - C) / F : null;
+  const meta = d.margen != null && d.margen >= 0.15 ? `Ya estás arriba de 15% de margen, el nivel de un negocio sano.`
+    : `Para llegar a <b>15% de margen</b> necesitas subir precios <b>${pNec != null ? Math.ceil(pNec * 100) + "%" : "—"}</b> o recortar gastos fijos <b>${gNec != null && gNec < 1 ? Math.ceil(gNec * 100) + "%" : "—"}</b> (o una mezcla).`;
+  $("#sim-out").innerHTML = `<div><div class="l">Tu utilidad al mes sería</div><div class="nv ${r.U < 0 ? "neg" : ""}">${peso(r.U)}</div></div>
+    <div class="dif">${Math.abs(dif) < 1 ? "Mueve las palancas para ver el efecto." : `${dif > 0 ? "<b>+" : "<b>−"}${peso(Math.abs(dif)).replace("−", "")}</b> al mes · <b>${dif > 0 ? "+" : "−"}${peso(Math.abs(dif * 12)).replace("−", "")}</b> al año`}</div>
+    <div class="mini"><div><b>${r.m != null ? pct(r.m) : "—"}</b><span>Margen</span></div><div><b>${peso(r.I)}</b><span>Ingresos</span></div><div><b>${r.pe ? peso(r.pe) : "—"}</b><span>Punto de equilibrio</span></div></div>
+    <div class="meta">${meta}</div>`;
+  $("#sim-meta").textContent = "Simulación sobre un mes. Supone que tu costo directo crece con el volumen y que tus gastos fijos no cambian si no los recortas.";
+}
+
+// ---------------------------------------------------------------- Kaptal
+function renderKaptal(d) {
+  const nivel = (porNivel(E.alertas)[0] || {}).nivel;
+  const falta = d.ingresos ? 0.15 * d.ingresos - d.utilidad : 0;
+  $("#t-kaptal").textContent = d.utilidad < 0 ? "Estás perdiendo dinero. No lo resuelvas solo."
+    : nivel === "rojo" || nivel === "ambar" ? "Tu negocio funciona, pero te deja poco. Eso se arregla."
+    : "Vas bien. Ahora toca crecer sin pagar de más.";
+  $("#kaptal-txt").innerHTML = falta > 0
+    ? `Este mes te quedaron ${peso(d.utilidad)} de ${peso(d.ingresos)}. Con un margen sano de 15% serían <b>${peso(falta)} más al mes</b>. Un CFO de Kaptal revisa estos números contigo y te dice exactamente qué mover.`
+    : `Tu margen ya está sano. Un CFO de Kaptal te ayuda a planear tus impuestos, proyectar tu crecimiento y decidir dónde invertir.`;
 }
 
 function renderPreguntas() {
