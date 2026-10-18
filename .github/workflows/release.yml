@@ -1,0 +1,16 @@
+name: release
+# Al publicar un tag vX.Y.Z arma el skill y lo adjunta al release: el link "latest" del README siempre apunta al zip nuevo.
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  skill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./skill/empaquetar.sh
+      - run: gh release upload "${GITHUB_REF_NAME}" dist/paccioli-cfo-skill.zip --clobber || gh release create "${GITHUB_REF_NAME}" dist/paccioli-cfo-skill.zip --title "Paccioli CFO ${GITHUB_REF_NAME}" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}
