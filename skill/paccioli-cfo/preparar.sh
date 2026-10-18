@@ -12,9 +12,9 @@ if "$PY" -c "import pdfplumber, openpyxl" 2>/dev/null; then
 fi
 VENV="$SKILL/.venv"
 [ -w "$SKILL" ] || VENV="${TMPDIR:-/tmp}/paccioli-cfo-venv"
-if [ ! -x "$VENV/bin/python" ]; then
-  "$PY" -m venv "$VENV" >&2
-fi
-"$VENV/bin/python" -c "import pdfplumber, openpyxl" 2>/dev/null || \
-  "$VENV/bin/python" -m pip install --quiet --disable-pip-version-check pdfplumber openpyxl >&2
-echo "$VENV/bin/python"
+VPY="$VENV/bin/python"
+[ -x "$VPY" ] || [ -x "$VENV/Scripts/python.exe" ] || "$PY" -m venv "$VENV" >&2
+[ -x "$VPY" ] || VPY="$VENV/Scripts/python.exe"   # Windows (Git Bash)
+"$VPY" -c "import pdfplumber, openpyxl" 2>/dev/null || \
+  "$VPY" -m pip install --quiet --disable-pip-version-check pdfplumber openpyxl >&2
+echo "$VPY"

@@ -34,12 +34,24 @@ No necesitas saber contabilidad. Si sabes descargar tu estado de cuenta, ya pued
 
 ### Opción 1 · El skill de CFO en Claude (lo más fácil)
 
+**En claude.ai (web o app):**
+
 1. Descarga el skill: **[paccioli-cfo-skill.zip](https://github.com/pachio2509/paccioli-cfo/releases/latest/download/paccioli-cfo-skill.zip)**.
-2. Súbelo a Claude: **Configuración → Capacidades → Skills → Subir skill**.
-   ¿Usas Claude Code? Descomprímelo en `~/.claude/skills/`.
+2. Súbelo: **Configuración → Capacidades → Skills → Subir skill**.
 3. Escríbele a Claude: *"Aquí está mi estado de cuenta, hazme mi dashboard"* y adjunta tu archivo.
 
-Claude lo lee (de **cualquier banco**, aunque sea un PDF escaneado o una foto), lo cuadra contra tu banco, te hace 2 o 3 preguntas y te entrega tu dashboard.
+**En Claude Code**, elige la que te quede más cómoda:
+
+- Pégale este link a Claude y dile *"instálalo"*: `https://github.com/pachio2509/paccioli-cfo/releases/latest`. Claude lo instala solo.
+- **Mac / Linux:** abre la app **Terminal**, pega esto y presiona Enter:
+  ```bash
+  curl -fsSL https://raw.githubusercontent.com/pachio2509/paccioli-cfo/main/instalar-skill.sh | bash
+  ```
+- **Windows:** descarga [instalar-skill.bat](https://raw.githubusercontent.com/pachio2509/paccioli-cfo/main/instalar-skill.bat) y haz doble clic. (Necesitas [Python 3.9 o más nuevo](https://www.python.org/downloads/); al instalarlo marca *Add Python to PATH*.)
+
+Después abre Claude Code de nuevo, adjunta tu estado de cuenta y escríbele: *"Aquí está mi estado de cuenta, hazme mi dashboard"*.
+
+Claude lo lee (de **cualquier banco**, aunque sea un PDF escaneado o una foto), lo cuadra contra tu banco, te hace 2 o 3 preguntas y te entrega tu dashboard. No necesita internet para leerlo ni sube tu archivo a ningún lado.
 
 ### Opción 2 · En tu computadora, en un paso
 

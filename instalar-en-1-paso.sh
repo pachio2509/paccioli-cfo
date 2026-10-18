@@ -14,6 +14,10 @@ rm -rf "$TMP"
 cd "$DESTINO"
 chmod +x instalar.sh iniciar.sh "Abrir Paccioli CFO.command"
 ./instalar.sh
+# si usas Claude Code, también te deja el skill de CFO instalado
+if [ -d "$HOME/.claude" ] && [ -z "$PACCIOLI_SIN_SKILL" ]; then
+  bash ./instalar-skill.sh || echo "  (no pude instalar el skill en Claude Code; el tablero funciona igual)"
+fi
 if [ -d "$HOME/Desktop" ] && [ -z "$PACCIOLI_SIN_ABRIR" ]; then
   ln -sf "$DESTINO/Abrir Paccioli CFO.command" "$HOME/Desktop/Paccioli CFO.command"
   echo "✓ Te dejé un acceso directo en tu Escritorio: «Paccioli CFO»"
